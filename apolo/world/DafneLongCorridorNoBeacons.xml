@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<root>
+	<World>
+		<WorldInfo name="" id="0"/>
+		<FaceSetPart name="Sala Cuadrada 8x8" id="1">
+			<face>
+				<colour r="0" b="0"/>
+				<vertex>
+					{20,-3,0}
+					{20,50,0}
+					{-20,50,0}
+					{-20,-3,0}
+				</vertex>
+			</face>
+			<face>
+				<colour r="0.2" g="0.2" b="0.8"/>
+				<vertex>
+					{0,0,0}
+					{0,2,0}
+					{53.5,2,0}
+					{53.5,0,0}
+				</vertex>
+				<orientation>
+					{1.5708,0,1.5708}
+				</orientation>
+				<position>
+					{20,-3,0}
+				</position>
+			</face>
+			<face>
+				<colour g="0.2" b="0.8"/>
+				<vertex>
+					{0,0,0}
+					{0,2,0}
+					{40,2,0}
+					{40,0,0}
+				</vertex>
+				<orientation>
+					{1.5708,0,-3.14159}
+				</orientation>
+				<position>
+					{20,50,0}
+				</position>
+			</face>
+			<face>
+				<colour r="0.2" g="0.2" b="0.8"/>
+				<vertex>
+					{-50,0,0}
+					{-50,2,0}
+					{7,2,0}
+					{7,0,0}
+				</vertex>
+				<orientation>
+					{1.5708,0,-1.5708}
+				</orientation>
+				<position>
+					{-20,4,0}
+				</position>
+			</face>
+			<face>
+				<colour r="0.2" g="0.2" b="0.8"/>
+				<vertex>
+					{0,0,0}
+					{0,2,0}
+					{40,2,0}
+					{40,0,0}
+				</vertex>
+				<orientation>
+					{1.5708,0,0}
+				</orientation>
+				<position>
+					{-20,-3,0}
+				</position>
+			</face>
+			<face>
+				<colour g="0" b="0"/>
+				<vertex>
+					{0,0,0}
+					{0,2,0}
+					{40,2,0}
+					{40,0,0}
+				</vertex>
+				<orientation>
+					{1.5708,0,0}
+				</orientation>
+				<position>
+					{-20,0,0}
+				</position>
+			</face>
+			<face>
+				<colour g="0" b="0"/>
+				<vertex>
+					{0,0,0}
+					{0,2,0}
+					{40,2,0}
+					{40,0,0}
+				</vertex>
+				<orientation>
+					{1.5708,0,0}
+				</orientation>
+				<position>
+					{-20,4,0}
+				</position>
+			</face>
+		</FaceSetPart>
+		<Pioneer3ATSim name="Dafne" id="2">
+			<orientation>
+				{0,-0,0.388673}
+			</orientation>
+			<position>
+				{7.53387,0.428832,0}
+			</position>
+			<odometry seconds="1764784532" microseconds="137000">
+				<orientation>
+					{-0,-0,-1.36531}
+				</orientation>
+				<position>
+					{-253.564,-34.2864,0}
+				</position>
+			</odometry>
+		</Pioneer3ATSim>
+		<LMS100Sim name="LMS100" id="3" linkTo="$Dafne$">
+			<position>
+				{0.1,0,0.4}
+			</position>
+			<colour r="0" g="1" b="0"/>
+		</LMS100Sim>
+		<LMS200Sim name="LMS200" id="4" linkTo="$Dafne$">
+			<position>
+				{0.1,0,0.4}
+			</position>
+			<colour r="0" g="1" b="0"/>
+		</LMS200Sim>
+		<PrismaticPart name="Prism" id="5">
+			<orientation>
+				{0,0,0.785398}
+			</orientation>
+			<position>
+				{8,2,0}
+			</position>
+			<face>
+				<vertex>
+					{1,0,0}
+					{6.12323e-17,1,0}
+					{-1,-1.22465e-16,0}
+					{6.12323e-17,-1,0}
+				</vertex>
+			</face>
+		</PrismaticPart>
+	</World>
+</root>
