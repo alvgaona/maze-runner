@@ -35,6 +35,9 @@ classdef NMPCCBFController < handle
 
         % State for warm-starting
         last_u          % Last control input (2xN)
+
+        % Scan FoV
+        scan_fov        % FoV of interest for the scans
     end
 
     methods
@@ -54,6 +57,7 @@ classdef NMPCCBFController < handle
                 options.MaxIterations (1,1) double {mustBePositive} = 100
                 options.UseSlack (1,1) logical = false
                 options.SlackPenalty (1,1) double {mustBePositive} = 1000
+                options.FoV (1,1) double {mustBePositive} = 30
             end
 
             obj.N = options.HorizonLength;
@@ -84,6 +88,8 @@ classdef NMPCCBFController < handle
             obj.solver_options.verbose = false;
 
             obj.last_u = zeros(2, obj.N);
+
+            obj.scan_fov = deg2rad(options.FoV);  % Convert to radians
 
             % Build base optimization problem once (no CBF constraints)
             obj.buildBaseOptimizationProblem();
@@ -140,8 +146,8 @@ classdef NMPCCBFController < handle
                     obj.N + 1 - size(xref_horizon, 1), 1)];
             end
 
-            % Filter scan: valid readings within constraint range
-            valid = ~isnan(scan(:,1)) & scan(:,1) < obj.constraint_range;
+            valid = ~isnan(scan(:,1)) & scan(:,1) < obj.constraint_range & ...
+                    abs(scan(:,2)) <= obj.scan_fov;
             valid_idx = find(valid);
 
             if ~isempty(valid_idx)
@@ -245,6 +251,27 @@ classdef NMPCCBFController < handle
 
         function reset(obj)
             obj.last_u = zeros(2, obj.N);
+        end
+
+        function info(obj)
+            fprintf('============== MPC Information ===============\n');
+            fprintf('  Horizon Length (N):        %d steps\n', obj.N);
+            fprintf('  Time Step (dt):            %.3f s\n', obj.dt);
+            fprintf('  State Weights (Q):         [%.2f, %.2f, %.2f]\n', diag(obj.Q)');
+            fprintf('  Control Weights (R):       [%.2f, %.2f]\n', diag(obj.R)');
+            fprintf('  Linear velocity:           [%.2f, %.2f] m/s\n', obj.v_min, obj.v_max);
+            fprintf('  Angular velocity:          [%.2f, %.2f] rad/s\n', obj.omega_min, obj.omega_max);
+            fprintf('  Safety Radius (d_safe):    %.2f m\n', obj.d_safe);
+            fprintf('  Aggressiveness (α):        %.2f\n', obj.alpha_cbf);
+            fprintf('  Constraint Range:          %.2f m\n', obj.constraint_range);
+            fprintf('  Field of View:             %.1f deg\n', rad2deg(obj.scan_fov));
+            fprintf('  Scan Downsample Factor:    %d\n', obj.scan_downsample);
+            fprintf('  Use Slack Variables:       %s\n', string(obj.use_slack));
+            if obj.use_slack
+                fprintf('  Slack Penalty:             %.1f\n', obj.slack_penalty);
+            end
+            fprintf('  Max Iterations:            %d\n', obj.solver_options.ipopt.max_iter);
+            fprintf('================================================\n\n');
         end
     end
 end

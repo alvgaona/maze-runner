@@ -22,19 +22,22 @@ scanner.info();
 
 %% NMPC Configuration
 controller = NMPCCBFController(...
-    'HorizonLength', 20, ...
+    'HorizonLength', 10, ...
     'TimeStep', 0.1, ...
-    'StateWeights', [1, 1, 0.1], ...
-    'ControlWeights', [1, 1], ...
+    'StateWeights', [1, 1, 0.01], ...
+    'ControlWeights', [10, 1], ...
     'VelocityLimits', [0, 1], ...
     'AngularLimits', [-2, 2], ...
     'SafetyRadius', 0.4, ...
-    'AlphaCBF', 0.1, ...
-    'ScanDownsample', 100, ...
-    'ConstraintRange', 3.0, ...
+    'AlphaCBF', 0.05, ...
+    'ScanDownsample', 5, ...
+    'ConstraintRange', 4.0, ...
     'MaxIterations', 100, ...
     'UseSlack', true, ...
-    'SlackPenalty', 100);
+    'SlackPenalty', 50, ...
+    'FoV', 10);
+
+controller.info()
 
 % Extract parameters for simulation and plotting
 dt = controller.dt;
@@ -65,6 +68,7 @@ x = x0;
 
 % Store LiDAR data for visualization
 scan_history = {};
+filtered_scan_history = {};  % Scans actually used by controller
 
 fprintf('Starting NMPC simulation with CBF obstacle avoidance...\n');
 fprintf('Horizontal corridor: width %.1fm, length %.1fm\n', corridor_width, corridor_length);
@@ -75,6 +79,19 @@ for k = 1:length(t)-1
     %% Get LiDAR scan
     scan = scanner.scan(x, obstacles);
     scan_history{k} = scan;
+
+    % Filter scan using same logic as controller
+    valid = ~isnan(scan(:,1)) & scan(:,1) < controller.constraint_range & ...
+            abs(scan(:,2)) <= controller.scan_fov;
+    valid_idx = find(valid);
+
+    if ~isempty(valid_idx)
+        valid_idx = valid_idx(1:controller.scan_downsample:end);
+        filtered_scan = scan(valid_idx, :);
+    else
+        filtered_scan = [];
+    end
+    filtered_scan_history{k} = filtered_scan;
 
     % Compute control using:
     % x: current state
@@ -251,12 +268,11 @@ robot_size = 0.3;
 robot_body = plot(NaN, NaN, 'bo', 'MarkerSize', 15, 'MarkerFaceColor', 'b', 'DisplayName', 'Robot');
 robot_heading = quiver(NaN, NaN, NaN, NaN, 0, 'b', 'LineWidth', 2, 'MaxHeadSize', 0.8);
 
-% LiDAR rays (show subset for clarity)
-lidar_rays = cell(1, 18);  % Show every 10th ray
-for i = 1:18
-    lidar_rays{i} = plot(NaN, NaN, 'c-', 'LineWidth', 0.5, 'Color', [0 0.8 0.8 0.3]);
-end
-lidar_points = plot(NaN, NaN, 'r.', 'MarkerSize', 4);
+% LiDAR rays - used by controller (red) and unused (purple)
+h_rays_used = plot(NaN, NaN, 'r-', 'LineWidth', 0.8, 'DisplayName', 'Used Scans');
+h_rays_unused = plot(NaN, NaN, 'm-', 'LineWidth', 0.5, 'DisplayName', 'Unused Scans');
+h_scan_used_points = plot(NaN, NaN, 'r.', 'MarkerSize', 6, 'HandleVisibility', 'off');
+h_scan_unused_points = plot(NaN, NaN, 'm.', 'MarkerSize', 4, 'HandleVisibility', 'off');
 
 % Safety circle
 safety_circle = plot(NaN, NaN, 'r--', 'LineWidth', 1.5, 'DisplayName', 'Safety Radius');
@@ -295,28 +311,112 @@ for k = 1:playback_speed:length(X(:,1))
     set(safety_circle, 'XData', safety_x, 'YData', safety_y);
 
     % LiDAR visualization
-    if k <= length(scan_history)
-        scan = scan_history{k};
-        valid = ~isnan(scan(:,1));
+    if k <= length(filtered_scan_history)
+        % Get filtered scans used by controller
+        filtered_scan = filtered_scan_history{k};
+        all_scan = scan_history{k};
 
-        if any(valid)
-            ranges = scan(valid, 1);
-            bearings = scan(valid, 2);
+        % Initialize arrays
+        used_ray_x = [];
+        used_ray_y = [];
+        used_point_x = [];
+        used_point_y = [];
+        unused_ray_x = [];
+        unused_ray_y = [];
+        unused_point_x = [];
+        unused_point_y = [];
 
-            x_points = x_rob + ranges .* cos(bearings + theta_rob);
-            y_points = y_rob + ranges .* sin(bearings + theta_rob);
+        % Filter to only FoV scans (valid and within FoV)
+        fov_mask = ~isnan(all_scan(:,1)) & abs(all_scan(:,2)) <= controller.scan_fov;
+        fov_scans = all_scan(fov_mask, :);
 
-            set(lidar_points, 'XData', x_points, 'YData', y_points);
+        if ~isempty(fov_scans)
+            % Get indices of scans used by controller within FoV scans
+            % The controller also filters by constraint_range and downsamples
+            fov_indices = find(fov_mask);
 
-            % Show subset of rays
-            ray_indices = 1:10:length(ranges);
-            for i = 1:min(length(ray_indices), 18)
-                idx = ray_indices(i);
-                if idx <= length(ranges)
-                    set(lidar_rays{i}, 'XData', [x_rob, x_points(idx)], ...
-                        'YData', [y_rob, y_points(idx)]);
+            % Among FoV scans, find which are used (within constraint range and downsampled)
+            in_range_mask = fov_scans(:,1) < controller.constraint_range;
+            in_range_idx = find(in_range_mask);
+
+            if ~isempty(in_range_idx)
+                used_local_idx = in_range_idx(1:controller.scan_downsample:end);
+                used_mask = false(size(fov_scans, 1), 1);
+                used_mask(used_local_idx) = true;
+            else
+                used_mask = false(size(fov_scans, 1), 1);
+            end
+
+            % Draw scans used by controller (red)
+            if any(used_mask)
+                used_ranges = fov_scans(used_mask, 1);
+                used_bearings = fov_scans(used_mask, 2);
+                n_used = length(used_ranges);
+
+                % Convert to world coordinates
+                x_points_used = x_rob + used_ranges .* cos(used_bearings + theta_rob);
+                y_points_used = y_rob + used_ranges .* sin(used_bearings + theta_rob);
+
+                used_point_x = x_points_used;
+                used_point_y = y_points_used;
+
+                % Create rays
+                used_ray_x = zeros(3 * n_used, 1);
+                used_ray_y = zeros(3 * n_used, 1);
+                for i = 1:n_used
+                    idx = 3 * (i - 1);
+                    used_ray_x(idx + 1) = x_rob;
+                    used_ray_y(idx + 1) = y_rob;
+                    used_ray_x(idx + 2) = x_points_used(i);
+                    used_ray_y(idx + 2) = y_points_used(i);
+                    used_ray_x(idx + 3) = NaN;
+                    used_ray_y(idx + 3) = NaN;
                 end
             end
+
+            % Draw unused scans within FoV (purple) - downsampled out or beyond constraint range
+            if any(~used_mask)
+                unused_ranges = fov_scans(~used_mask, 1);
+                unused_bearings = fov_scans(~used_mask, 2);
+                n_unused = sum(~used_mask);
+
+                % Convert to world coordinates
+                x_points_unused = x_rob + unused_ranges .* cos(unused_bearings + theta_rob);
+                y_points_unused = y_rob + unused_ranges .* sin(unused_bearings + theta_rob);
+
+                unused_point_x = x_points_unused;
+                unused_point_y = y_points_unused;
+
+                % Create rays
+                unused_ray_x = zeros(3 * n_unused, 1);
+                unused_ray_y = zeros(3 * n_unused, 1);
+                for i = 1:n_unused
+                    idx = 3 * (i - 1);
+                    unused_ray_x(idx + 1) = x_rob;
+                    unused_ray_y(idx + 1) = y_rob;
+                    unused_ray_x(idx + 2) = x_points_unused(i);
+                    unused_ray_y(idx + 2) = y_points_unused(i);
+                    unused_ray_x(idx + 3) = NaN;
+                    unused_ray_y(idx + 3) = NaN;
+                end
+            end
+        end
+
+        % Update plots
+        if ~isempty(used_ray_x)
+            set(h_rays_used, 'XData', used_ray_x, 'YData', used_ray_y);
+            set(h_scan_used_points, 'XData', used_point_x, 'YData', used_point_y);
+        else
+            set(h_rays_used, 'XData', NaN, 'YData', NaN);
+            set(h_scan_used_points, 'XData', NaN, 'YData', NaN);
+        end
+
+        if ~isempty(unused_ray_x)
+            set(h_rays_unused, 'XData', unused_ray_x, 'YData', unused_ray_y);
+            set(h_scan_unused_points, 'XData', unused_point_x, 'YData', unused_point_y);
+        else
+            set(h_rays_unused, 'XData', NaN, 'YData', NaN);
+            set(h_scan_unused_points, 'XData', NaN, 'YData', NaN);
         end
     end
 
@@ -326,7 +426,7 @@ for k = 1:playback_speed:length(X(:,1))
     end
 
     drawnow;
-    pause(0.02);
+    pause(0.1);
 end
 
 fprintf('Animation complete!\n');
