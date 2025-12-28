@@ -187,8 +187,10 @@ classdef NMPCCBFController < handle
             x_err = X(:,obj.N+1) - obj.xref_param(obj.N+1,:)';
             cost = cost + x_err' * obj.Q * x_err;
 
-            % Add CBF constraints dynamically (only if obstacles present)
+            % Add HOCBF constraints dynamically (only if obstacles present)
             if n_obstacles > 0
+                alpha = obj.alpha_cbf;
+
                 if obj.use_slack
                     % Create slack variables for soft constraints
                     S = opti.variable(n_obstacles, obj.N);
@@ -200,32 +202,42 @@ classdef NMPCCBFController < handle
                         end
                     end
 
-                    % Add CBF constraints with slack
+                    % Add HOCBF constraints with slack
                     for k = 1:obj.N
                         v = U(1,k);
                         omega = U(2,k);
 
-                        h = ranges - obj.d_safe;
-                        h_dot = -v * cos(bearings) - ranges .* omega .* sin(bearings);
-
                         for i = 1:n_obstacles
-                            opti.subject_to(h_dot(i) + obj.alpha_cbf * h(i) + S(i,k) >= 0);
+                            r = ranges(i);
+                            phi = bearings(i);
+
+                            % Barrier and derivatives
+                            h = r - obj.d_safe;
+                            h_dot = -v * cos(phi);
+                            h_ddot = v^2 * sin(phi)^2 / r - v * omega * sin(phi);
+
+                            opti.subject_to(h_ddot + 2*alpha*h_dot + alpha^2*h + S(i,k) >= 0);
                         end
                     end
 
                     % Add slack penalty to cost
                     cost = cost + obj.slack_penalty * sum(sum(S.^2));
                 else
-                    % Hard CBF constraints
+                    % Hard HOCBF constraints
                     for k = 1:obj.N
                         v = U(1,k);
                         omega = U(2,k);
 
-                        h = ranges - obj.d_safe;
-                        h_dot = -v * cos(bearings) - ranges .* omega .* sin(bearings);
-
                         for i = 1:n_obstacles
-                            opti.subject_to(h_dot(i) + obj.alpha_cbf * h(i) >= 0);
+                            r = ranges(i);
+                            phi = bearings(i);
+
+                            % Barrier and derivatives
+                            h = r - obj.d_safe;
+                            h_dot = -v * cos(phi);
+                            h_ddot = v^2 * sin(phi)^2 / r - v * omega * sin(phi);
+
+                            opti.subject_to(h_ddot + 2*alpha*h_dot + alpha^2*h >= 0);
                         end
                     end
                 end
