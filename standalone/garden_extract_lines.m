@@ -11,7 +11,7 @@ map_lines = extract_map_lines(occupancy_grid_map, resolution);
 %% Visualization
 figure('Name', 'Line Extraction - Hough Transform');
 
-imshow(occupancy_grid_map);
+imshow(~occupancy_grid_map);
 hold on;
 
 [height, width] = size(occupancy_grid_map);
