@@ -65,7 +65,7 @@ classdef EKFLines < handle
                 sigma_d = observed_lines(j, 4);         % Distance uncertainty [m]
 
                 % Data association: Match observed line to map line
-                [alpha_map, d_map, match_found] = obj.associateLine(alpha_observed);
+                [alpha_map, d_map, match_found] = obj.associateLine(alpha_observed, d_observed);
 
                 if ~match_found
                     continue;  % Skip if no good match found
@@ -114,13 +114,14 @@ classdef EKFLines < handle
     end
 
     methods (Access = private)
-        function [alpha_map, d_map, match_found] = associateLine(obj, alpha_observed)
+        function [alpha_map, d_map, match_found] = associateLine(obj, alpha_observed, d_observed)
             % associateLine - Data association for observed line
             %
-            % Finds the closest matching map line based on angle in world frame.
+            % Finds the closest matching map line based on both angle and distance.
             %
             % Args:
             %   alpha_observed: Observed line angle in robot frame [rad]
+            %   d_observed: Observed line distance in robot frame [m]
             %
             % Returns:
             %   alpha_map: Matched map line angle in world frame [rad]
@@ -130,20 +131,37 @@ classdef EKFLines < handle
             % Transform observed angle to world frame
             alpha_world = alpha_observed + obj.x(3);
 
-            % Find closest matching line by angle
+            % Find closest matching line by angle and distance
             num_walls = size(obj.map_lines, 1);
             angle_differences = zeros(num_walls, 1);
+            distance_differences = zeros(num_walls, 1);
 
             for w = 1:num_walls
+                % Angular difference
                 angle_differences(w) = abs(atan2(...
                     sin(obj.map_lines(w, 1) - alpha_world), ...
                     cos(obj.map_lines(w, 1) - alpha_world)));
+
+                % Predicted distance for this map line given current robot pose
+                alpha_map_w = obj.map_lines(w, 1);
+                d_map_w = obj.map_lines(w, 2);
+                normal_map_w = [cos(alpha_map_w); sin(alpha_map_w)];
+                d_predicted = d_map_w - normal_map_w' * obj.x(1:2);
+
+                % Distance difference
+                distance_differences(w) = abs(d_observed - d_predicted);
             end
 
-            [min_angle_diff, idx] = min(angle_differences);
+            angle_weight = 2.0;
+            dist_weight = 1.0;
 
-            % Accept match if angle difference is reasonable (e.g., < 30 degrees)
-            match_found = min_angle_diff < deg2rad(30);
+            combined_score = angle_weight * angle_differences + dist_weight * distance_differences;
+
+            [~, idx] = min(combined_score);
+            min_angle_diff = angle_differences(idx);
+            min_dist_diff = distance_differences(idx);
+
+            match_found = (min_angle_diff < deg2rad(30)) && (min_dist_diff < 0.5);
 
             if match_found
                 alpha_map = obj.map_lines(idx, 1);
