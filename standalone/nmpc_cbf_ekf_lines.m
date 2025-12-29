@@ -57,6 +57,11 @@ v_max = controller.v_max;
 omega_min = controller.omega_min;
 omega_max = controller.omega_max;
 
+% Forward-Gated Path Progression
+waypoint_threshold = 0.1;  % Advance to next waypoint when within this distance [m]
+search_window = 200;       % Max points to search ahead (prevents jumps across loops)
+lookahead_dist = 0.5;      % Always track at least this far ahead [m]
+
 %% Interpolate Reference Trajectory to Simulation Rate
 % Original trajectory has 84 points, interpolate to finer resolution
 traj_original_time = linspace(0, 1, size(traj, 1));  % Normalized time
@@ -101,6 +106,10 @@ fprintf('Simulation: %d Hz, Control: %d Hz, EKF: %d Hz\n\n', 1/dt, 1/control_dt,
 x_true = x0_true;
 u_current = [0; 0];
 
+% Initialize ref_idx to closest waypoint to initial EKF estimate
+distances = vecnorm(xref(:,1:2) - x0_ekf(1:2)', 2, 2);
+[~, ref_idx] = min(distances);
+
 for k = 1:num_steps-1
     % Store previous state
     x_prev = x_true;
@@ -113,8 +122,27 @@ for k = 1:num_steps-1
         % Get LiDAR scan for CBF (obstacle avoidance)
         scan = scanner.scan(x_true, map_lines);
 
+        % Find closest point within search window (prevents jumps across loops)
+        end_idx = min(ref_idx + search_window, size(xref, 1));
+        distances = vecnorm(xref(ref_idx:end_idx, 1:2) - x_est(1:2)', 2, 2);
+        [~, offset] = min(distances);
+        ref_idx = ref_idx + offset - 1;
+
+        % Advance waypoint when robot is close enough
+        while ref_idx < size(xref, 1) && norm(x_est(1:2) - xref(ref_idx, 1:2)') < waypoint_threshold
+            ref_idx = ref_idx + 1;
+        end
+
+        % Add lookahead distance to ensure we always track ahead
+        track_idx = ref_idx;
+        accumulated_dist = 0;
+        while track_idx < size(xref, 1) && accumulated_dist < lookahead_dist
+            accumulated_dist = accumulated_dist + norm(xref(track_idx+1, 1:2) - xref(track_idx, 1:2));
+            track_idx = track_idx + 1;
+        end
+
         % Compute control using estimated state
-        u_current = controller.compute(x_est, xref(k:end, :), scan);
+        u_current = controller.compute(x_est, xref(track_idx:end, :), scan);
 
         if mod(k, 1) == 0
             fprintf('Time: %.1fs, True: [%.2f, %.2f], Est: [%.2f, %.2f]\n', ...
