@@ -1,7 +1,6 @@
 clear; close all; clc; rng(0);
 
 load('gardenMap.mat');
-%map = binaryOccupancyMap(imrotate(garden(:,:,1), 180), "Resolution", 10);
 trajectories = load('trayectorias.mat');
 
 traj = trajectories.trajFull;

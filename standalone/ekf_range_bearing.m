@@ -58,14 +58,14 @@ R_std = sqrt(diag(R));
 
 %% Beacon Positions
 beacons = [
-    3  25;   % Beacon 1
-    1  1;   % Beacon 2
-   11  3;   % Beacon 3
-    30  0;   % Beacon 4
-    15  6;   % Beacon 5
-    20  5;   % Beacon 6
-   10  7;   % Beacon 7
-   30 34;   % Beacon 8
+    3  25 1;   % Beacon 1
+    1  1 2;   % Beacon 2
+   11  3 3;   % Beacon 3
+    30  0 4;   % Beacon 4
+    15  6 5;   % Beacon 5
+    20  5 6;   % Beacon 6
+   10  7 7;   % Beacon 7
+   30 34 8;   % Beacon 8
 ];
 num_beacons = size(beacons, 1);
 num_measurements = 2 * num_beacons;  % Range + bearing per beacon
@@ -190,7 +190,8 @@ end
 
 %% Compute Estimation Errors
 position_error = sqrt(sum((true_trajectory(1:2,:) - estimated_trajectory(1:2,:)).^2, 1));
-angle_error = abs(true_trajectory(3,:) - estimated_trajectory(3,:));
+angle_diff = true_trajectory(3,:) - estimated_trajectory(3,:);
+angle_error = abs(atan2(sin(angle_diff), cos(angle_diff)));
 
 % Wrap angles to [-pi, pi] for visualization
 true_trajectory_wrapped = true_trajectory;
@@ -235,10 +236,11 @@ time_vector = (0:num_steps-1) * dt;
 subplot(2,3,2);
 hold on; grid on;
 h_error = plot(time_vector(1), position_error(1), 'm-', 'LineWidth', 2);
-xlabel('Time [s]'); ylabel('Position Error [m]');
-title('Position Estimation Error');
+h_angle_error = plot(time_vector(1), angle_error(1), 'g-', 'LineWidth', 2);
+xlabel('Time [s]'); ylabel('State Error');
+title('State Estimation Error');
 xlim([0 simulation_time]);
-ylim([0 max(position_error) * 1.1]);
+ylim([0 max([position_error angle_error]) * 1.1]);
 
 % Plot 3: Covariance
 subplot(2,3,3);
@@ -248,7 +250,7 @@ h_cov_y = plot(time_vector(1), sqrt(variance_history(2, 1)), 'g-', 'LineWidth', 
 h_cov_theta = plot(time_vector(1), sqrt(variance_history(3, 1)), 'b-', 'LineWidth', 1.5);
 xlabel('Time [s]'); ylabel('Standard Deviation');
 title('State Uncertainty');
-legend('\sigma_x [m]', '\sigma_y [m]', '\sigma_\theta [rad]', 'Location', 'best', 'AutoUpdate', 'off');
+legend('$\sigma_x$ [m]', '$\sigma_y$ [m]', '$\sigma_\theta$ [rad]', 'Location', 'best', 'AutoUpdate', 'off');
 xlim([0 simulation_time]);
 ylim([0 max([sqrt(variance_history(1,:)), sqrt(variance_history(2,:)), sqrt(variance_history(3,:))]) * 1.1]);
 
@@ -335,6 +337,7 @@ for k = 1:animation_step:num_steps
     % Update error plot
     subplot(2,3,2);
     set(h_error, 'XData', time_vector(1:k), 'YData', position_error(1:k));
+    set(h_angle_error, 'XData', time_vector(1:k), 'YData', angle_error(1:k));
 
     % Update covariance plot
     subplot(2,3,3);
