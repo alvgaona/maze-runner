@@ -12,33 +12,33 @@ control_rate = control_dt / dt;
 
 %% Beacon Positions
 beacons = [
-    4.0000   15.7000;
-    10.0000    8.5000;
-    17.7000    4.0000;
-    23.7000   11.0000;
-    29.7000    4.0000;
-    14.0000   13.9000;
-    16.0000   21.4000;
-    28.0000   22.0000;
-    29.9000   26.0000;
-    28.0000   33.6000;
-    22.0000   39.4000;
-    16.0000   33.8000;
-    8.1000   26.0000;
-    3.9000   18.2000;
-    4.0000   33.9000;
-    10.0000   39.9000;
-    17.9000   38.1000;
-    8.3000   44.0000;
-    2.0000   37.7000;
-    4.0000   58.0000;
-    8.1000   50.0000;
-    24.0000   50.0000;
-    14.3000   56.0000;
-    20.3000   44.0000;
-    29.9000   44.0000;
-    28.0000   36.5000;
-    28.0000   57.8000;
+    4.0000   15.7000 1;
+    10.0000    8.5000 2;
+    17.7000    4.0000 3;
+    23.7000   11.0000 4;
+    29.7000    4.0000 5;
+    14.0000   13.9000 6;
+    16.0000   21.4000 7;
+    28.0000   22.0000 8;
+    29.9000   26.0000 9;
+    28.0000   33.6000 10;
+    22.0000   39.4000 11;
+    16.0000   33.8000 12;
+    8.1000   26.0000 13;
+    3.9000   18.2000 14;
+    4.0000   33.9000 15;
+    10.0000   39.9000 16;
+    17.9000   38.1000 17;
+    8.3000   44.0000 18;
+    2.0000   37.7000 19;
+    4.0000   58.0000 20;
+    8.1000   50.0000 21;
+    24.0000   50.0000 22;
+    14.3000   56.0000 23;
+    20.3000   44.0000 24;
+    29.9000   44.0000 25;
+    28.0000   36.5000 26;
+    28.0000   57.8000 27;
 ];
 num_beacons = size(beacons, 1);
 
@@ -91,6 +91,11 @@ v_max = controller.v_max;
 omega_min = controller.omega_min;
 omega_max = controller.omega_max;
 
+% Gated waypoint progression
+waypoint_threshold = 0.1;  % Advance to next waypoint when within this distance [m]
+lookahead_dist = 0.5;      % Always track at least this far ahead [m]
+search_window = 200;       % Max points to search ahead (prevents jumps across loops)
+
 %% Interpolate Reference Trajectory to Simulation Rate
 % Original trajectory has 84 points, interpolate to finer resolution
 traj_original_time = linspace(0, 1, size(traj, 1));  % Normalized time
@@ -135,6 +140,10 @@ fprintf('Simulation: %d Hz, Control: %d Hz, EKF: %d Hz\n\n', 1/dt, 1/control_dt,
 x_true = x0_true;
 u_current = [0; 0];
 
+% Initialize ref_idx to closest waypoint to initial EKF estimate
+distances = vecnorm(xref(:,1:2) - x0_ekf(1:2)', 2, 2);
+[~, ref_idx] = min(distances);
+
 for k = 1:num_steps-1
     % Store previous state
     x_prev = x_true;
@@ -147,8 +156,27 @@ for k = 1:num_steps-1
         % Get LiDAR scan for CBF (obstacle avoidance)
         scan = scanner.scan(x_true, obstacles);
 
+        % Find closest point within search window (prevents jumps across loops)
+        end_idx = min(ref_idx + search_window, size(xref, 1));
+        distances = vecnorm(xref(ref_idx:end_idx, 1:2) - x_est(1:2)', 2, 2);
+        [~, offset] = min(distances);
+        ref_idx = ref_idx + offset - 1;  % Update ref_idx to closest forward point
+
+        % Advance waypoint when robot is close enough
+        while ref_idx < size(xref, 1) && norm(x_est(1:2) - xref(ref_idx, 1:2)') < waypoint_threshold
+            ref_idx = ref_idx + 1;
+        end
+
+        % Add lookahead distance to ensure we always track ahead
+        track_idx = ref_idx;
+        accumulated_dist = 0;
+        while track_idx < size(xref, 1) && accumulated_dist < lookahead_dist
+            accumulated_dist = accumulated_dist + norm(xref(track_idx+1, 1:2) - xref(track_idx, 1:2));
+            track_idx = track_idx + 1;
+        end
+
         % Compute control using estimated state
-        u_current = controller.compute(x_est, xref(k:end, :), scan);
+        u_current = controller.compute(x_est, xref(track_idx:end, :), scan);
 
         if mod(k, 1) == 0
             fprintf('Time: %.1fs, True: [%.2f, %.2f], Est: [%.2f, %.2f]\n', ...
