@@ -34,7 +34,7 @@ controller = NMPCCBFController(...
     'ConstraintRange', 4.0, ...
     'MaxIterations', 100, ...
     'UseSlack', true, ...
-    'SlackPenalty', 50, ...
+    'SlackPenalty', 1000, ...
     'FoV', 10);
 
 controller.info()
@@ -47,7 +47,7 @@ omega_min = controller.omega_min;
 omega_max = controller.omega_max;
 
 %% Reference Trajectory
-Tsim = 30;
+Tsim = 60;
 t = 0:dt:Tsim;
 
 % Straight horizontal trajectory through center of corridor
@@ -143,8 +143,6 @@ plot(X(end,1), X(end,2), 'ro', 'MarkerSize', 10, 'MarkerFaceColor', 'r');
 xlabel('$x$ [m]', 'Interpreter', 'latex');
 ylabel('$y$ [m]', 'Interpreter', 'latex');
 title('Horizontal Corridor Navigation', 'Interpreter', 'latex');
-legend('Wall', '', 'Obstacle', '', 'Reference', 'NMPC+CBF', 'Start', 'End', ...
-       'Interpreter', 'latex', 'Location', 'best');
 xlim([-1, 13]);
 ylim([-3, 3]);
 
