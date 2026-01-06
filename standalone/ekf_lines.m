@@ -103,9 +103,9 @@ heading_error_ekf = atan2(sin(heading_error_ekf), cos(heading_error_ekf));  % No
 time_vector = (0:num_steps-1) * dt;
 
 %% Visualization (ignore logic)
-fig_animation = figure('Name', 'EKF Animation', 'Position', [50 50 1400 1000]);
+fig_animation = figure('Name', 'EKF Animation');
 
-subplot(2, 3, [1 4]);
+subplot(1, 3, 1);
 hold on; grid on; axis equal;
 
 % Draw map walls once
@@ -136,30 +136,19 @@ h_lidar_rays = plot(NaN, NaN, 'Color', [1 0.5 0.5], 'LineWidth', 0.5);
 h_lidar_points = plot(NaN, NaN, 'r.', 'MarkerSize', 4);
 h_observed = plot(NaN, NaN, 'g-', 'LineWidth', 2);
 
-legend([h_map, h_true_traj, h_est_traj, h_rays_hits, h_rays_misses, h_scan_hits, h_scan_misses, h_observed], ...
-       {'Map Walls', 'True Trajectory', 'EKF Estimate', ...
-        'LiDAR Hits', 'LiDAR Misses', 'Hit Points', 'Miss Points', 'Observed Lines'}, ...
-       'Location', 'best', 'AutoUpdate', 'off');
-xlim([-5 12]); ylim([-5 12]);
+xlim([-5 12]); ylim([-5 20]);
 
-subplot(2, 3, 2);
+subplot(1, 3, 2);
 hold on; grid on;
 h_error_ekf = plot(time_vector(1), position_error_ekf(1), 'r-', 'LineWidth', 2);
-xlabel('Time [s]'); ylabel('Position Error [m]');
-title('Position Error');
-legend('Line-EKF', 'Location', 'best', 'AutoUpdate', 'off');
-xlim([0 sim_time]); ylim([0 max(position_error_ekf) * 1.1]);
-
-subplot(2, 3, 3);
-hold on; grid on;
 h_heading_error = plot(time_vector(1), rad2deg(heading_error_ekf(1)), 'b-', 'LineWidth', 2);
-xlabel('Time [s]'); ylabel('Heading Error [deg]');
-title('Heading Error');
-legend('Line-EKF', 'Location', 'best', 'AutoUpdate', 'off');
-xlim([0 sim_time]);
-ylim([min(rad2deg(heading_error_ekf))*1.1, max(rad2deg(heading_error_ekf))*1.1]);
 
-subplot(2, 3, 5);
+xlabel('Time [s]'); ylabel('State Error');
+title('State Error');
+legend('Position Error', 'Heading Error', 'Location', 'best', 'AutoUpdate', 'off');
+xlim([0 sim_time]); ylim([0 max(0.1) * 1.1]);
+
+subplot(1, 3, 3);
 hold on; grid on;
 h_cov_x = plot(time_vector(1), covariance_history(1, 1), 'r-', 'LineWidth', 1.5);
 h_cov_y = plot(time_vector(1), covariance_history(2, 1), 'g-', 'LineWidth', 1.5);
@@ -267,13 +256,13 @@ for k = 1:animation_step:num_steps
         h_observed_lines = [h_observed_lines; h];
     end
 
-    subplot(2, 3, 2);
+    subplot(1, 3, 2);
     set(h_error_ekf, 'XData', time_vector(1:k), 'YData', position_error_ekf(1:k));
 
-    subplot(2, 3, 3);
+    subplot(1, 3, 2);
     set(h_heading_error, 'XData', time_vector(1:k), 'YData', rad2deg(heading_error_ekf(1:k)));
 
-    subplot(2, 3, 5);
+    subplot(1, 3, 3);
     set(h_cov_x, 'XData', time_vector(1:k), 'YData', covariance_history(1, 1:k));
     set(h_cov_y, 'XData', time_vector(1:k), 'YData', covariance_history(2, 1:k));
     set(h_cov_theta, 'XData', time_vector(1:k), 'YData', rad2deg(covariance_history(3, 1:k)));
