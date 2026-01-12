@@ -97,7 +97,7 @@ for k = 1:length(t)-1
     % x: current state
     % xref: from current iteration onwards
     % scan: measurements scanned in current iteration
-    u = controller.compute(x, xref(k, :), scan);
+    u = controller.compute(x, xref(k:end, :), scan);
 
     % Apply control to vehicle using ode45 (unicycle dynamics)
     odefun = @(t, x) unicycle(x, u);
@@ -424,7 +424,7 @@ for k = 1:playback_speed:length(X(:,1))
     end
 
     drawnow;
-    pause(0.1);
+    pause(0.01);
 end
 
 fprintf('Animation complete!\n');
