@@ -2,6 +2,11 @@
 .DS_Store
 casadi-*
 
+# ros2
+build/
+install/
+log/
+
 # pixi environments
 .pixi/*
 !.pixi/config.toml

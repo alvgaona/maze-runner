@@ -1,0 +1,43 @@
+[workspace]
+authors = ["Alvaro Gaona <alvgaona@gmail.com>"]
+channels = ["conda-forge", "robostack-jazzy"]
+name = "maze-runner"
+platforms = ["osx-arm64"]
+version = "0.1.0"
+
+[tasks]
+clean = "rm -rf build/ install/ log/"
+gen-compile-flags = "./scripts/gen-compile-flags.sh"
+merge-compile-commands = "./scripts/merge-compile-commands.sh"
+build-pkg = "./scripts/build-pkg.sh"
+test-pkg = "sh -c 'colcon test --packages-up-to \"$0\" --event-handlers console_direct+'"
+test-result = "colcon test-result --verbose"
+
+[dependencies]
+colcon-common-extensions = ">=0.3.0,<0.4"
+ninja = ">=1.13.2,<2"
+cmake = ">=4.2.1,<5"
+eigen = ">=3.4.0,<4"
+jq = ">=1.8.1,<2"
+scipy = ">=1.17.0,<2"
+opencv = ">=4.11.0,<5"
+pandas = ">=2.3.3,<3"
+
+[feature.jazzy.dependencies]
+ros-jazzy-desktop = "*"
+ros-jazzy-ros-gz = "*"
+ros-jazzy-ros-gz-interfaces = "*"
+ros-jazzy-ros-gz-bridge = ">=1.0.16,<2"
+ros-jazzy-gz-ros2-control = ">=1.2.14,<2"
+ros-jazzy-dynamixel-sdk = ">=3.8.4,<4"
+ros-jazzy-moveit = ">=2.12.3,<3"
+ros-jazzy-moveit-servo = ">=2.12.3,<3"
+ros-jazzy-nav2-common = ">=1.3.7,<2"
+ros-jazzy-robot-localization = ">=3.8.2,<4"
+
+[environments]
+jazzy = ["jazzy"]
+default = ["jazzy"]
+
+[activation]
+scripts = ["install/setup.sh"]
