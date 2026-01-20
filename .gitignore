@@ -1,3 +1,7 @@
 *.txt
 .DS_Store
 casadi-*
+
+# pixi environments
+.pixi/*
+!.pixi/config.toml
