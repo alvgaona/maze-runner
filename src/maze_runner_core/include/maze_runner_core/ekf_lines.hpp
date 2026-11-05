@@ -4,24 +4,10 @@
 
 #include <Eigen/Dense>
 
+#include "maze_runner_core/lines.hpp"
+
 namespace maze_runner
 {
-
-// Infinite line in Hesse normal form: points p with n(alpha) . p = d.
-struct Line
-{
-  double alpha;  // angle of the line normal [rad]
-  double d;      // distance from origin along the normal [m]
-};
-
-// A line extracted from a scan, in the robot frame, with its 1-sigma uncertainty.
-struct ObservedLine
-{
-  double alpha;
-  double d;
-  double sigma_alpha;
-  double sigma_d;
-};
 
 // EKF localization against a known map of lines. State is [x, y, theta].
 class EkfLines
@@ -43,6 +29,10 @@ public:
   const Eigen::Matrix3d & covariance() const { return P_; }
 
 private:
+  // Map line i with its normal flipped, if needed, to point from the robot toward it,
+  // matching the canonical form of observed lines.
+  Line oriented(int i) const;
+
   // Index of the map line matching the observation, or -1.
   int associate(const ObservedLine & obs) const;
 

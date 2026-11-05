@@ -27,13 +27,16 @@ EkfLines make_ekf(const Eigen::Vector3d & x0, double p0 = 0.1)
     Eigen::Vector2d(0.01, 0.001).asDiagonal(), 9.21);
 }
 
-// What the robot at `pose` would observe for map line `m`.
+// What the robot at `pose` would observe for map line `m`, in canonical form (d >= 0).
 ObservedLine observe(const Line & m, const Eigen::Vector3d & pose, double sigma = 0.02)
 {
-  return {
-    m.alpha - pose(2),
-    m.d - std::cos(m.alpha) * pose(0) - std::sin(m.alpha) * pose(1),
-    sigma, sigma};
+  double alpha = m.alpha - pose(2);
+  double d = m.d - std::cos(m.alpha) * pose(0) - std::sin(m.alpha) * pose(1);
+  if (d < 0) {
+    alpha += kPi;
+    d = -d;
+  }
+  return {std::atan2(std::sin(alpha), std::cos(alpha)), d, sigma, sigma};
 }
 
 }  // namespace
@@ -101,6 +104,14 @@ TEST(EkfLines, NoMatchWhenTooFar)
   // A wall at x=8 is not in the map; nearest x-wall predicts d=5 vs observed 3.
   EXPECT_EQ(ekf.update({{0.0, 3.0, 0.02, 0.02}}), 0);
   EXPECT_EQ(ekf.state(), Eigen::Vector3d(5.0, 5.0, 0.0));
+}
+
+TEST(EkfLines, MatchesWallBehindMapNormal)
+{
+  // Wall x=0 is stored as (0, 0); from x=3 the robot sees it at alpha=pi, d=3.
+  auto ekf = make_ekf({3.2, 5.0, 0.0});
+  EXPECT_EQ(ekf.update({{kPi, 3.0, 0.02, 0.02}}), 1);
+  EXPECT_NEAR(ekf.state()(0), 3.0, 0.01);
 }
 
 TEST(EkfLines, MahalanobisGateRejects)

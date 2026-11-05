@@ -9,6 +9,8 @@ find_package(Eigen3 REQUIRED)
 
 add_library(${PROJECT_NAME}
   src/ekf_lines.cpp
+  src/ransac_lines.cpp
+  src/map_lines.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -31,6 +33,10 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_ekf_lines test/test_ekf_lines.cpp)
   target_link_libraries(test_ekf_lines ${PROJECT_NAME})
+  ament_add_gtest(test_ransac_lines test/test_ransac_lines.cpp)
+  target_link_libraries(test_ransac_lines ${PROJECT_NAME})
+  ament_add_gtest(test_map_lines test/test_map_lines.cpp)
+  target_link_libraries(test_map_lines ${PROJECT_NAME})
 endif()
 
 ament_package()

@@ -58,7 +58,7 @@ int EkfLines::update(const std::vector<ObservedLine> & observed)
     if (idx < 0) {
       continue;
     }
-    const Line & m = map_[idx];
+    const Line m = oriented(idx);
     const double c = std::cos(m.alpha);
     const double s = std::sin(m.alpha);
 
@@ -89,6 +89,16 @@ int EkfLines::update(const std::vector<ObservedLine> & observed)
   return applied;
 }
 
+Line EkfLines::oriented(int i) const
+{
+  const Line & m = map_[i];
+  const double d_robot = m.d - std::cos(m.alpha) * x_(0) - std::sin(m.alpha) * x_(1);
+  if (d_robot >= 0.0) {
+    return m;
+  }
+  return {wrap_angle(m.alpha + std::numbers::pi), -m.d};
+}
+
 int EkfLines::associate(const ObservedLine & obs) const
 {
   const double alpha_world = obs.alpha + x_(2);
@@ -99,7 +109,7 @@ int EkfLines::associate(const ObservedLine & obs) const
   double best_dist_diff = 0.0;
 
   for (int i = 0; i < static_cast<int>(map_.size()); ++i) {
-    const Line & m = map_[i];
+    const Line m = oriented(i);
     const double angle_diff = std::abs(wrap_angle(m.alpha - alpha_world));
     const double d_predicted = m.d - std::cos(m.alpha) * x_(0) - std::sin(m.alpha) * x_(1);
     const double dist_diff = std::abs(obs.d - d_predicted);
