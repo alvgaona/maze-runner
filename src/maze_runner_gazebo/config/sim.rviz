@@ -3,7 +3,7 @@ Panels:
     Name: Displays
 Visualization Manager:
   Global Options:
-    Fixed Frame: odom
+    Fixed Frame: map
     Frame Rate: 30
   Displays:
     - Class: rviz_default_plugins/Grid
@@ -30,6 +30,11 @@ Visualization Manager:
       Topic:
         Value: /diff_drive_controller/odom
       Keep: 50
+    - Class: rviz_default_plugins/PoseWithCovariance
+      Name: EKF
+      Enabled: true
+      Topic:
+        Value: /ekf/pose
   Views:
     Current:
       Class: rviz_default_plugins/TopDownOrtho

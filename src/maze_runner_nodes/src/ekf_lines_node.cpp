@@ -20,6 +20,7 @@
 #include <sdf/Box.hh>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <tf2_ros/buffer.hpp>
+#include <tf2_ros/transform_broadcaster.hpp>
 #include <tf2_ros/transform_listener.hpp>
 
 #include "maze_runner_core/ekf_lines.hpp"
@@ -123,6 +124,7 @@ public:
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(get_clock());
     tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
 
+    tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
     pose_pub_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("ekf/pose", 10);
     odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
       "diff_drive_controller/odom", 50,
@@ -143,6 +145,26 @@ private:
     }
     last_odom_ = odom;
     publish(msg.header.stamp);
+    publish_map_to_odom(msg, odom);
+  }
+
+  // map->odom such that map->odom->base equals the EKF pose (REP 105).
+  void publish_map_to_odom(const nav_msgs::msg::Odometry & msg, const Eigen::Vector3d & odom)
+  {
+    const auto & x = ekf_->state();
+    const double yaw = x(2) - odom(2);
+    const double c = std::cos(yaw);
+    const double s = std::sin(yaw);
+
+    geometry_msgs::msg::TransformStamped t;
+    t.header.stamp = msg.header.stamp;
+    t.header.frame_id = map_frame_;
+    t.child_frame_id = msg.header.frame_id;
+    t.transform.translation.x = x(0) - (c * odom(0) - s * odom(1));
+    t.transform.translation.y = x(1) - (s * odom(0) + c * odom(1));
+    t.transform.rotation.z = std::sin(yaw / 2.0);
+    t.transform.rotation.w = std::cos(yaw / 2.0);
+    tf_broadcaster_->sendTransform(t);
   }
 
   void on_scan(const sensor_msgs::msg::LaserScan & msg)
@@ -210,6 +232,7 @@ private:
 
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
+  std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
   rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pose_pub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
