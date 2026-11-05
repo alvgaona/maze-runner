@@ -26,6 +26,17 @@ target_link_libraries(ekf_lines_node
 )
 target_compile_options(ekf_lines_node PRIVATE -Wall -Wextra -Wpedantic)
 
-install(TARGETS ekf_lines_node DESTINATION lib/${PROJECT_NAME})
+add_executable(nmpc_cbf_node src/nmpc_cbf_node.cpp)
+target_link_libraries(nmpc_cbf_node
+  maze_runner_core::maze_runner_core
+  rclcpp::rclcpp
+  ${geometry_msgs_TARGETS}
+  ${nav_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  tf2_ros::tf2_ros
+)
+target_compile_options(nmpc_cbf_node PRIVATE -Wall -Wextra -Wpedantic)
+
+install(TARGETS ekf_lines_node nmpc_cbf_node DESTINATION lib/${PROJECT_NAME})
 
 ament_package()

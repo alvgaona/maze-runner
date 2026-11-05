@@ -1,0 +1,6 @@
+# Snake through test_maze.sdf: lower corridor, up the east gap, middle corridor,
+# up the west gap, upper corridor. Start matches the default spawn pose.
+nmpc_cbf:
+  ros__parameters:
+    waypoints: [1.5, 1.5,  8.5, 1.5,  8.5, 5.0,  1.5, 5.0,  1.5, 8.5,  8.5, 8.5]
+    reference_speed: 0.5

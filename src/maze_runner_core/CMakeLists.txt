@@ -6,18 +6,21 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(ament_cmake REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(casadi REQUIRED)
 
 add_library(${PROJECT_NAME}
   src/ekf_lines.cpp
   src/ransac_lines.cpp
   src/map_lines.cpp
   src/odometry.cpp
+  src/nmpc_cbf.cpp
+  src/path_tracker.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include/${PROJECT_NAME}>
 )
-target_link_libraries(${PROJECT_NAME} PUBLIC Eigen3::Eigen)
+target_link_libraries(${PROJECT_NAME} PUBLIC Eigen3::Eigen casadi::casadi)
 target_compile_options(${PROJECT_NAME} PRIVATE -Wall -Wextra -Wpedantic)
 
 install(DIRECTORY include/ DESTINATION include/${PROJECT_NAME})
@@ -28,7 +31,7 @@ install(TARGETS ${PROJECT_NAME}
   RUNTIME DESTINATION bin
 )
 ament_export_targets(export_${PROJECT_NAME} HAS_LIBRARY_TARGET)
-ament_export_dependencies(Eigen3)
+ament_export_dependencies(Eigen3 casadi)
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
@@ -40,6 +43,10 @@ if(BUILD_TESTING)
   target_link_libraries(test_map_lines ${PROJECT_NAME})
   ament_add_gtest(test_odometry test/test_odometry.cpp)
   target_link_libraries(test_odometry ${PROJECT_NAME})
+  ament_add_gtest(test_path_tracker test/test_path_tracker.cpp)
+  target_link_libraries(test_path_tracker ${PROJECT_NAME})
+  ament_add_gtest(test_nmpc_cbf test/test_nmpc_cbf.cpp TIMEOUT 120)
+  target_link_libraries(test_nmpc_cbf ${PROJECT_NAME})
 endif()
 
 ament_package()

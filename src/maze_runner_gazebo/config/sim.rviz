@@ -35,6 +35,12 @@ Visualization Manager:
       Enabled: true
       Topic:
         Value: /ekf/pose
+    - Class: rviz_default_plugins/Path
+      Name: Reference
+      Enabled: true
+      Topic:
+        Value: /nmpc/reference
+        Durability Policy: Transient Local
   Views:
     Current:
       Class: rviz_default_plugins/TopDownOrtho

@@ -10,6 +10,7 @@
   <buildtool_depend>eigen3_cmake_module</buildtool_depend>
 
   <depend>eigen</depend>
+  <!-- casadi comes from conda-forge via pixi, not a rosdep key -->
 
   <test_depend>ament_cmake_gtest</test_depend>
 
