@@ -21,3 +21,8 @@ diff_drive_controller:
     enable_odom_tf: true
     publish_rate: 50.0
     cmd_vel_timeout: 0.5
+
+    # Ramp forward speed so the wheels don't slip on takeoff; slip corrupts odometry heading.
+    # No turn-rate limit: the NMPC model assumes instant turn rate, and lag makes it oscillate.
+    linear.x.max_acceleration: 1.0
+    linear.x.max_deceleration: -1.0

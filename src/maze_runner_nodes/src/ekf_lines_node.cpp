@@ -2,6 +2,7 @@
 // extracted from the lidar scan, against map lines built from the world SDF walls.
 
 #include <cmath>
+#include <filesystem>
 #include <optional>
 #include <random>
 #include <stdexcept>
@@ -9,6 +10,9 @@
 #include <vector>
 
 #include <geometry_msgs/msg/pose_with_covariance_stamped.hpp>
+#include <gz/common/Mesh.hh>
+#include <gz/common/MeshManager.hh>
+#include <gz/common/SubMesh.hh>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sdf/Root.hh>
@@ -18,6 +22,7 @@
 #include <sdf/Collision.hh>
 #include <sdf/Geometry.hh>
 #include <sdf/Box.hh>
+#include <sdf/Mesh.hh>
 #include <sensor_msgs/msg/laser_scan.hpp>
 #include <tf2_ros/buffer.hpp>
 #include <tf2_ros/transform_broadcaster.hpp>
@@ -49,10 +54,12 @@ Eigen::Vector3d compose(const Eigen::Vector3d & a, const gz::math::Pose3d & b)
     a(2) + b.Rot().Yaw()};
 }
 
-// Box collisions of one model in the world SDF, as planar wall boxes.
+// Map lines from the wall collisions of one model in the world SDF: boxes and meshes.
 // shortcut: assumes default relative_to (link in model, collision in link) and upright
-// boxes; switch to SemanticPose::Resolve if worlds start using frames.
-std::vector<WallBox> load_walls(const std::string & path, const std::string & model_name)
+// geometry; switch to SemanticPose::Resolve if worlds start using frames.
+std::vector<maze_runner::Line> load_map_lines(
+  const std::string & path, const std::string & model_name, double min_face_length,
+  rclcpp::Logger logger)
 {
   sdf::Root root;
   const auto errors = root.Load(path);
@@ -66,22 +73,54 @@ std::vector<WallBox> load_walls(const std::string & path, const std::string & mo
     throw std::runtime_error("model '" + model_name + "' not found in " + path);
   }
 
+  std::vector<WallBox> boxes;
+  std::vector<maze_runner::Triangle> triangles;
   const Eigen::Vector3d model_pose = compose(Eigen::Vector3d::Zero(), model->RawPose());
-  std::vector<WallBox> walls;
   for (uint64_t i = 0; i < model->LinkCount(); ++i) {
     const sdf::Link * link = model->LinkByIndex(i);
     const Eigen::Vector3d link_pose = compose(model_pose, link->RawPose());
     for (uint64_t j = 0; j < link->CollisionCount(); ++j) {
       const sdf::Collision * col = link->CollisionByIndex(j);
-      const sdf::Box * box = col->Geom()->BoxShape();
-      if (!box) {
-        continue;
-      }
       const Eigen::Vector3d p = compose(link_pose, col->RawPose());
-      walls.push_back({p(0), p(1), p(2), box->Size().X(), box->Size().Y()});
+
+      if (const sdf::Box * box = col->Geom()->BoxShape()) {
+        boxes.push_back({p(0), p(1), p(2), box->Size().X(), box->Size().Y()});
+      } else if (const sdf::Mesh * mesh_sdf = col->Geom()->MeshShape()) {
+        // Relative URIs are relative to the SDF file, as Gazebo resolves them.
+        std::filesystem::path file = mesh_sdf->Uri();
+        if (file.is_relative()) {
+          file = std::filesystem::path(mesh_sdf->FilePath()).parent_path() / file;
+        }
+        const gz::common::Mesh * mesh = gz::common::MeshManager::Instance()->Load(file.string());
+        if (!mesh) {
+          throw std::runtime_error("cannot load mesh " + file.string());
+        }
+        const auto & scale = mesh_sdf->Scale();
+        const double c = std::cos(p(2));
+        const double s = std::sin(p(2));
+        for (unsigned int m = 0; m < mesh->SubMeshCount(); ++m) {
+          const auto sub = mesh->SubMeshByIndex(m).lock();
+          for (unsigned int k = 0; sub && k + 2 < sub->IndexCount(); k += 3) {
+            maze_runner::Triangle tri;
+            for (int v = 0; v < 3; ++v) {
+              const auto q = sub->Vertex(sub->Index(k + v)) * scale;
+              tri[v] = {p(0) + c * q.X() - s * q.Y(), p(1) + s * q.X() + c * q.Y(), q.Z()};
+            }
+            triangles.push_back(tri);
+          }
+        }
+      }
     }
   }
-  return walls;
+
+  auto lines = maze_runner::wall_lines(boxes, min_face_length);
+  for (const auto & l : maze_runner::mesh_lines(triangles, min_face_length)) {
+    lines.push_back(l);
+  }
+  RCLCPP_INFO(
+    logger, "Map from %s: %zu boxes, %zu mesh triangles -> %zu lines", path.c_str(), boxes.size(),
+    triangles.size(), lines.size());
+  return lines;
 }
 
 class EkfLinesNode : public rclcpp::Node
@@ -98,6 +137,8 @@ public:
     const auto chi2 = declare_parameter<double>("chi2_threshold", 9.21);
     // Sideways slip std per sqrt(meter) traveled; covers wheel slip and wall contact.
     const auto lateral_sigma = declare_parameter<double>("lateral_sigma", 0.1);
+    // Heading slip std per sqrt(m + rad) of motion; startup wheel slip skews odom heading.
+    const auto heading_sigma = declare_parameter<double>("heading_sigma", 0.1);
     const auto min_face = declare_parameter<double>("min_face_length", 0.5);
     ransac_threshold_ = declare_parameter<double>("ransac_threshold", 0.03);
     ransac_min_points_ = static_cast<int>(declare_parameter<int>("ransac_min_points", 10));
@@ -108,18 +149,14 @@ public:
       throw std::invalid_argument("initial_pose/initial_sigma need 3 values, odom_sigma needs 2");
     }
 
-    const auto walls = load_walls(world_file, wall_model);
-    auto map = maze_runner::wall_lines(walls, min_face);
-    RCLCPP_INFO(
-      get_logger(), "Loaded %zu walls -> %zu map lines from %s", walls.size(), map.size(),
-      world_file.c_str());
+    auto map = load_map_lines(world_file, wall_model, min_face, get_logger());
 
     ekf_.emplace(
       Eigen::Vector3d(x0[0], x0[1], x0[2]),
       Eigen::Vector3d(s0[0] * s0[0], s0[1] * s0[1], s0[2] * s0[2]).asDiagonal().toDenseMatrix(),
       std::move(map),
       Eigen::Vector2d(sq[0] * sq[0], sq[1] * sq[1]).asDiagonal().toDenseMatrix(), chi2,
-      lateral_sigma * lateral_sigma);
+      lateral_sigma * lateral_sigma, heading_sigma * heading_sigma);
 
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(get_clock());
     tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);

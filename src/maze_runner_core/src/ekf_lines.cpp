@@ -21,9 +21,10 @@ constexpr double kMaxDistDiff = 0.5;
 
 EkfLines::EkfLines(
   const Eigen::Vector3d & x0, const Eigen::Matrix3d & P0, std::vector<Line> map,
-  const Eigen::Matrix2d & process_noise, double chi2_threshold, double lateral_variance)
+  const Eigen::Matrix2d & process_noise, double chi2_threshold, double lateral_variance,
+  double heading_variance)
 : x_(x0), P_(P0), map_(std::move(map)), Q_(process_noise), chi2_threshold_(chi2_threshold),
-  lateral_variance_(lateral_variance)
+  lateral_variance_(lateral_variance), heading_variance_(heading_variance)
 {
 }
 
@@ -51,6 +52,7 @@ void EkfLines::predict(double delta_d, double delta_theta)
 
   const Eigen::Vector2d lateral(-s, c);
   P_.topLeftCorner<2, 2>() += lateral_variance_ * std::abs(delta_d) * lateral * lateral.transpose();
+  P_(2, 2) += heading_variance_ * (std::abs(delta_d) + std::abs(delta_theta));
 }
 
 int EkfLines::update(const std::vector<ObservedLine> & observed)

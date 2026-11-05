@@ -17,9 +17,12 @@ public:
   // chi2_threshold: Mahalanobis gate on the 2D innovation.
   // lateral_variance: sideways slip variance per meter traveled [m^2/m]; models motion
   // the unicycle model can't explain (wheel slip, scraping a wall). 0 disables it.
+  // heading_variance: heading slip variance per unit of motion [rad^2 per (m + rad)];
+  // wheel slip shows up as a wrong delta_theta. 0 disables it.
   EkfLines(
     const Eigen::Vector3d & x0, const Eigen::Matrix3d & P0, std::vector<Line> map,
-    const Eigen::Matrix2d & process_noise, double chi2_threshold, double lateral_variance = 0.0);
+    const Eigen::Matrix2d & process_noise, double chi2_threshold, double lateral_variance = 0.0,
+    double heading_variance = 0.0);
 
   // Midpoint odometry model.
   void predict(double delta_d, double delta_theta);
@@ -44,6 +47,7 @@ private:
   Eigen::Matrix2d Q_;
   double chi2_threshold_;
   double lateral_variance_;
+  double heading_variance_;
 };
 
 }  // namespace maze_runner

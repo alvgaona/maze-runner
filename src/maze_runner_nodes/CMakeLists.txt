@@ -12,6 +12,8 @@ find_package(sensor_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(sdformat_vendor REQUIRED)
 find_package(sdformat REQUIRED)
+find_package(gz_common_vendor REQUIRED)
+find_package(gz-common REQUIRED COMPONENTS graphics)
 find_package(maze_runner_core REQUIRED)
 
 add_executable(ekf_lines_node src/ekf_lines_node.cpp)
@@ -23,6 +25,7 @@ target_link_libraries(ekf_lines_node
   ${sensor_msgs_TARGETS}
   tf2_ros::tf2_ros
   sdformat::sdformat
+  gz-common::graphics
 )
 target_compile_options(ekf_lines_node PRIVATE -Wall -Wextra -Wpedantic)
 

@@ -95,6 +95,21 @@ TEST(EkfLines, LateralNoiseGrowsSidewaysOnly)
   EXPECT_NEAR(diff.cwiseAbs().maxCoeff(), 0.0, 1e-12);
 }
 
+TEST(EkfLines, HeadingNoiseGrowsWithMotion)
+{
+  // 1 m + 0.5 rad of motion with 0.02 rad^2 per unit adds 0.03 to P(2,2) only.
+  const Eigen::Matrix2d Q = Eigen::Vector2d(0.01, 0.001).asDiagonal();
+  EkfLines plain({0.0, 0.0, 0.0}, Eigen::Matrix3d::Identity() * 0.1, box_map(), Q, 9.21);
+  EkfLines slip({0.0, 0.0, 0.0}, Eigen::Matrix3d::Identity() * 0.1, box_map(), Q, 9.21, 0.0, 0.02);
+  plain.predict(1.0, -0.5);
+  slip.predict(1.0, -0.5);
+
+  Eigen::Matrix3d diff = slip.covariance() - plain.covariance();
+  EXPECT_NEAR(diff(2, 2), 0.03, 1e-12);
+  diff(2, 2) = 0.0;
+  EXPECT_NEAR(diff.cwiseAbs().maxCoeff(), 0.0, 1e-12);
+}
+
 TEST(EkfLines, UpdateCorrectsTowardTruth)
 {
   const Eigen::Vector3d truth(3.0, 4.0, 0.1);

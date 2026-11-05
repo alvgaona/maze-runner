@@ -1,14 +1,15 @@
 <launch>
-  <arg name="world" default="$(find-pkg-share maze_runner_gazebo)/worlds/test_maze.sdf"/>
+  <arg name="world" default="$(find-pkg-share maze_runner_gazebo)/worlds/maze.sdf"/>
   <arg name="gui" default="true"/>
   <arg name="rviz" default="true"/>
   <arg name="localization" default="true"/>
   <!-- Path following needs localization (map -> odom) -->
   <arg name="controller" default="false"/>
-  <arg name="path" default="$(find-pkg-share maze_runner_gazebo)/config/test_maze_path.yaml"/>
-  <arg name="x" default="1.5"/>
-  <arg name="y" default="1.5"/>
-  <arg name="yaw" default="0.0"/>
+  <arg name="path" default="$(find-pkg-share maze_runner_gazebo)/config/maze_path.yaml"/>
+  <!-- Default start: first point of the Apolo trajDirect route -->
+  <arg name="x" default="2.393"/>
+  <arg name="y" default="4.307"/>
+  <arg name="yaw" default="0.045"/>
 
   <!-- Server and GUI run as separate processes: required on macOS, harmless on Linux -->
   <include file="$(find-pkg-share ros_gz_sim)/launch/gz_sim.launch.py">
