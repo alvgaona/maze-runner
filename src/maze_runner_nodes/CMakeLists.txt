@@ -1,0 +1,31 @@
+cmake_minimum_required(VERSION 3.20)
+project(maze_runner_nodes LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(sdformat_vendor REQUIRED)
+find_package(sdformat REQUIRED)
+find_package(maze_runner_core REQUIRED)
+
+add_executable(ekf_lines_node src/ekf_lines_node.cpp)
+target_link_libraries(ekf_lines_node
+  maze_runner_core::maze_runner_core
+  rclcpp::rclcpp
+  ${geometry_msgs_TARGETS}
+  ${nav_msgs_TARGETS}
+  ${sensor_msgs_TARGETS}
+  tf2_ros::tf2_ros
+  sdformat::sdformat
+)
+target_compile_options(ekf_lines_node PRIVATE -Wall -Wextra -Wpedantic)
+
+install(TARGETS ekf_lines_node DESTINATION lib/${PROJECT_NAME})
+
+ament_package()

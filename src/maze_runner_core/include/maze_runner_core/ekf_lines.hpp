@@ -15,9 +15,11 @@ class EkfLines
 public:
   // process_noise: covariance of the odometry increments [delta_d, delta_theta].
   // chi2_threshold: Mahalanobis gate on the 2D innovation.
+  // lateral_variance: sideways slip variance per meter traveled [m^2/m]; models motion
+  // the unicycle model can't explain (wheel slip, scraping a wall). 0 disables it.
   EkfLines(
     const Eigen::Vector3d & x0, const Eigen::Matrix3d & P0, std::vector<Line> map,
-    const Eigen::Matrix2d & process_noise, double chi2_threshold);
+    const Eigen::Matrix2d & process_noise, double chi2_threshold, double lateral_variance = 0.0);
 
   // Midpoint odometry model.
   void predict(double delta_d, double delta_theta);
@@ -41,6 +43,7 @@ private:
   std::vector<Line> map_;
   Eigen::Matrix2d Q_;
   double chi2_threshold_;
+  double lateral_variance_;
 };
 
 }  // namespace maze_runner

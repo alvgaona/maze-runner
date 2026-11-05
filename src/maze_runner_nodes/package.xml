@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>maze_runner_nodes</name>
+  <version>0.1.0</version>
+  <description>ROS 2 nodes wrapping maze_runner_core</description>
+  <maintainer email="alvgaona@gmail.com">Alvaro Gaona</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>maze_runner_core</depend>
+  <depend>rclcpp</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>sensor_msgs</depend>
+  <depend>tf2_ros</depend>
+  <depend>sdformat_vendor</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

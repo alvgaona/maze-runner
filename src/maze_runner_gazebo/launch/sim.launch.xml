@@ -2,6 +2,7 @@
   <arg name="world" default="$(find-pkg-share maze_runner_gazebo)/worlds/test_maze.sdf"/>
   <arg name="gui" default="true"/>
   <arg name="rviz" default="true"/>
+  <arg name="localization" default="true"/>
   <arg name="x" default="1.5"/>
   <arg name="y" default="1.5"/>
   <arg name="yaw" default="0.0"/>
@@ -29,6 +30,12 @@
   <node pkg="controller_manager" exec="spawner" output="screen"
         args="joint_state_broadcaster diff_drive_controller --controller-manager-timeout 60 --switch-timeout 30
               --param-file $(find-pkg-share maze_runner_description)/config/controllers.yaml">
+    <param name="use_sim_time" value="true"/>
+  </node>
+
+  <node pkg="maze_runner_nodes" exec="ekf_lines_node" output="screen" if="$(var localization)">
+    <param name="world_file" value="$(var world)"/>
+    <param name="initial_pose" value="[$(var x), $(var y), $(var yaw)]"/>
     <param name="use_sim_time" value="true"/>
   </node>
 

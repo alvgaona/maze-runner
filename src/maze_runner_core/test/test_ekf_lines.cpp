@@ -80,6 +80,21 @@ TEST(EkfLines, PredictCovariance)
   EXPECT_TRUE(P.isApprox(P.transpose()));
 }
 
+TEST(EkfLines, LateralNoiseGrowsSidewaysOnly)
+{
+  // Heading +y: sideways is x. 2 m traveled with 0.01 m^2/m adds 0.02 to P(0,0) only.
+  const Eigen::Matrix2d Q = Eigen::Vector2d(0.01, 0.001).asDiagonal();
+  EkfLines plain({0.0, 0.0, kPi / 2}, Eigen::Matrix3d::Identity() * 0.1, box_map(), Q, 9.21);
+  EkfLines slip({0.0, 0.0, kPi / 2}, Eigen::Matrix3d::Identity() * 0.1, box_map(), Q, 9.21, 0.01);
+  plain.predict(-2.0, 0.0);  // reversing counts too
+  slip.predict(-2.0, 0.0);
+
+  Eigen::Matrix3d diff = slip.covariance() - plain.covariance();
+  EXPECT_NEAR(diff(0, 0), 0.02, 1e-12);
+  diff(0, 0) = 0.0;
+  EXPECT_NEAR(diff.cwiseAbs().maxCoeff(), 0.0, 1e-12);
+}
+
 TEST(EkfLines, UpdateCorrectsTowardTruth)
 {
   const Eigen::Vector3d truth(3.0, 4.0, 0.1);
