@@ -1,3 +1,10 @@
 *.txt
 .DS_Store
 casadi-*
+!CMakeLists.txt
+
+# pixi / colcon
+.pixi/
+build/
+install/
+log/

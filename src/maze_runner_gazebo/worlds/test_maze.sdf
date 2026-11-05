@@ -1,0 +1,98 @@
+<?xml version="1.0"?>
+<!-- 10 x 10 m test maze. Walls are the only line features; beacons are visual-only. -->
+<sdf version="1.11">
+  <world name="test_maze">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry><plane><normal>0 0 1</normal><size>50 50</size></plane></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><plane><normal>0 0 1</normal><size>50 50</size></plane></geometry>
+          <material><diffuse>0.4 0.3 0.2 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Each wall link: pose = center, box = length x thickness x height -->
+    <model name="maze">
+      <static>true</static>
+      <link name="wall_south">
+        <pose>5 0 0.5 0 0 0</pose>
+        <collision name="c"><geometry><box><size>10 0.1 1</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>10 0.1 1</size></box></geometry></visual>
+      </link>
+      <link name="wall_north">
+        <pose>5 10 0.5 0 0 0</pose>
+        <collision name="c"><geometry><box><size>10 0.1 1</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>10 0.1 1</size></box></geometry></visual>
+      </link>
+      <link name="wall_west">
+        <pose>0 5 0.5 0 0 1.5708</pose>
+        <collision name="c"><geometry><box><size>10 0.1 1</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>10 0.1 1</size></box></geometry></visual>
+      </link>
+      <link name="wall_east">
+        <pose>10 5 0.5 0 0 1.5708</pose>
+        <collision name="c"><geometry><box><size>10 0.1 1</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>10 0.1 1</size></box></geometry></visual>
+      </link>
+      <link name="wall_inner_1">
+        <pose>3.5 3 0.5 0 0 0</pose>
+        <collision name="c"><geometry><box><size>7 0.1 1</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>7 0.1 1</size></box></geometry></visual>
+      </link>
+      <link name="wall_inner_2">
+        <pose>6.5 7 0.5 0 0 0</pose>
+        <collision name="c"><geometry><box><size>7 0.1 1</size></box></geometry></collision>
+        <visual name="v"><geometry><box><size>7 0.1 1</size></box></geometry></visual>
+      </link>
+    </model>
+
+    <!-- Beacon links named beacon_<id>; read by the beacon sensor node -->
+    <model name="beacons">
+      <static>true</static>
+      <link name="beacon_1">
+        <pose>9 1.5 0.3 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.05</radius><length>0.6</length></cylinder></geometry>
+          <material><diffuse>1 0.8 0 1</diffuse></material>
+        </visual>
+      </link>
+      <link name="beacon_2">
+        <pose>1 5 0.3 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.05</radius><length>0.6</length></cylinder></geometry>
+          <material><diffuse>1 0.8 0 1</diffuse></material>
+        </visual>
+      </link>
+      <link name="beacon_3">
+        <pose>9 8.5 0.3 0 0 0</pose>
+        <visual name="v">
+          <geometry><cylinder><radius>0.05</radius><length>0.6</length></cylinder></geometry>
+          <material><diffuse>1 0.8 0 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>

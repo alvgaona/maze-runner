@@ -1,0 +1,39 @@
+<launch>
+  <arg name="world" default="$(find-pkg-share maze_runner_gazebo)/worlds/test_maze.sdf"/>
+  <arg name="gui" default="true"/>
+  <arg name="rviz" default="true"/>
+  <arg name="x" default="1.5"/>
+  <arg name="y" default="1.5"/>
+  <arg name="yaw" default="0.0"/>
+
+  <!-- Server and GUI run as separate processes: required on macOS, harmless on Linux -->
+  <include file="$(find-pkg-share ros_gz_sim)/launch/gz_sim.launch.py">
+    <arg name="gz_args" value="-s -r $(var world)"/>
+  </include>
+  <executable cmd="gz sim -g" if="$(var gui)" output="screen"/>
+
+  <node pkg="robot_state_publisher" exec="robot_state_publisher" output="screen">
+    <param name="robot_description"
+           value="$(command 'xacro $(find-pkg-share maze_runner_description)/urdf/maze_runner.urdf.xacro')"/>
+    <param name="use_sim_time" value="true"/>
+  </node>
+
+  <node pkg="ros_gz_sim" exec="create" output="screen"
+        args="-topic robot_description -name maze_runner -x $(var x) -y $(var y) -z 0.05 -Y $(var yaw)"/>
+
+  <node pkg="ros_gz_bridge" exec="parameter_bridge" output="screen">
+    <param name="config_file" value="$(find-pkg-share maze_runner_gazebo)/config/bridge.yaml"/>
+    <param name="use_sim_time" value="true"/>
+  </node>
+
+  <node pkg="controller_manager" exec="spawner" output="screen"
+        args="joint_state_broadcaster diff_drive_controller --controller-manager-timeout 60 --switch-timeout 30
+              --param-file $(find-pkg-share maze_runner_description)/config/controllers.yaml">
+    <param name="use_sim_time" value="true"/>
+  </node>
+
+  <node pkg="rviz2" exec="rviz2" if="$(var rviz)"
+        args="-d $(find-pkg-share maze_runner_gazebo)/config/sim.rviz">
+    <param name="use_sim_time" value="true"/>
+  </node>
+</launch>
