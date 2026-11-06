@@ -3,10 +3,10 @@
 
 #include <gtest/gtest.h>
 
-#include "maze_runner_core/path_tracker.hpp"
+#include "maze_runner_core/control/path_tracker.hpp"
 
-using maze_runner::densify;
-using maze_runner::PathTracker;
+using maze_runner::control::densify;
+using maze_runner::control::PathTracker;
 
 TEST(Densify, SpacingAndHeadings)
 {

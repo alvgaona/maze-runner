@@ -8,10 +8,12 @@
 
 #include <gtest/gtest.h>
 
-#include "map_loader.hpp"
+#include "localization/world_map_loader.hpp"
+#include "maze_runner_core/angles.hpp"
 
 namespace fs = std::filesystem;
-using maze_runner::Line;
+using maze_runner::localization::Line;
+using maze_runner::localization::WorldMapLoader;
 
 namespace
 {
@@ -85,7 +87,7 @@ fs::path write_world()
 
 TEST(MapLoader, BoxAndRelativeScaledMeshInRotatedModel)
 {
-  const auto map = maze_runner::load_map_lines(write_world().string(), "maze", 0.5);
+  const auto map = WorldMapLoader(0.5).load(write_world().string(), "maze");
   EXPECT_EQ(map.boxes, 1u);
   EXPECT_EQ(map.triangles, 12u);
   ASSERT_EQ(map.lines.size(), 6u);
@@ -101,5 +103,5 @@ TEST(MapLoader, BoxAndRelativeScaledMeshInRotatedModel)
 
 TEST(MapLoader, MissingModelThrows)
 {
-  EXPECT_THROW(maze_runner::load_map_lines(write_world().string(), "nope", 0.5), std::runtime_error);
+  EXPECT_THROW(WorldMapLoader(0.5).load(write_world().string(), "nope"), std::runtime_error);
 }

@@ -9,12 +9,12 @@ find_package(Eigen3 REQUIRED)
 find_package(casadi REQUIRED)
 
 add_library(${PROJECT_NAME}
-  src/ekf_lines.cpp
-  src/ransac_lines.cpp
-  src/map_lines.cpp
-  src/odometry.cpp
-  src/nmpc_cbf.cpp
-  src/path_tracker.cpp
+  src/localization/ekf_lines.cpp
+  src/localization/ransac_lines.cpp
+  src/localization/map_lines.cpp
+  src/localization/odometry.cpp
+  src/control/nmpc_cbf.cpp
+  src/control/path_tracker.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -35,17 +35,17 @@ ament_export_dependencies(Eigen3 casadi)
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
-  ament_add_gtest(test_ekf_lines test/test_ekf_lines.cpp)
+  ament_add_gtest(test_ekf_lines test/localization/test_ekf_lines.cpp)
   target_link_libraries(test_ekf_lines ${PROJECT_NAME})
-  ament_add_gtest(test_ransac_lines test/test_ransac_lines.cpp)
+  ament_add_gtest(test_ransac_lines test/localization/test_ransac_lines.cpp)
   target_link_libraries(test_ransac_lines ${PROJECT_NAME})
-  ament_add_gtest(test_map_lines test/test_map_lines.cpp)
+  ament_add_gtest(test_map_lines test/localization/test_map_lines.cpp)
   target_link_libraries(test_map_lines ${PROJECT_NAME})
-  ament_add_gtest(test_odometry test/test_odometry.cpp)
+  ament_add_gtest(test_odometry test/localization/test_odometry.cpp)
   target_link_libraries(test_odometry ${PROJECT_NAME})
-  ament_add_gtest(test_path_tracker test/test_path_tracker.cpp)
+  ament_add_gtest(test_path_tracker test/control/test_path_tracker.cpp)
   target_link_libraries(test_path_tracker ${PROJECT_NAME})
-  ament_add_gtest(test_nmpc_cbf test/test_nmpc_cbf.cpp TIMEOUT 120)
+  ament_add_gtest(test_nmpc_cbf test/control/test_nmpc_cbf.cpp TIMEOUT 120)
   target_link_libraries(test_nmpc_cbf ${PROJECT_NAME})
 endif()
 

@@ -6,11 +6,11 @@
 
 #include <gtest/gtest.h>
 
-#include "maze_runner_core/nmpc_cbf.hpp"
-#include "maze_runner_core/path_tracker.hpp"
+#include "maze_runner_core/control/nmpc_cbf.hpp"
+#include "maze_runner_core/control/path_tracker.hpp"
 
-using maze_runner::NmpcCbf;
-using maze_runner::NmpcCbfConfig;
+using maze_runner::control::NmpcCbf;
+using maze_runner::control::NmpcCbfConfig;
 
 namespace
 {
@@ -108,8 +108,8 @@ TEST(NmpcCbf, ClosedLoopFollowsLPath)
 {
   // Unicycle simulation following an L path with the forward-gated tracker.
   const double dt = 0.1;
-  const auto path = maze_runner::densify({{0.0, 0.0}, {4.0, 0.0}, {4.0, 3.0}}, 0.1);
-  maze_runner::PathTracker tracker(path);
+  const auto path = maze_runner::control::densify({{0.0, 0.0}, {4.0, 0.0}, {4.0, 3.0}}, 0.1);
+  maze_runner::control::PathTracker tracker(path);
   NmpcCbf mpc;
 
   Eigen::Vector3d x(0.0, 0.0, 0.0);
@@ -185,8 +185,8 @@ PillarRun run_past_pillar(
   const double dt = 0.1;
   const Eigen::Vector2d pillar = origin + Eigen::Vector2d(3.0, pillar_y);
   const double pillar_radius = 0.15;
-  const auto path = maze_runner::densify({origin, origin + Eigen::Vector2d(6.0, 0.0)}, 0.05);
-  maze_runner::PathTracker tracker(path);
+  const auto path = maze_runner::control::densify({origin, origin + Eigen::Vector2d(6.0, 0.0)}, 0.05);
+  maze_runner::control::PathTracker tracker(path);
   NmpcCbf mpc(cfg);
 
   PillarRun run;

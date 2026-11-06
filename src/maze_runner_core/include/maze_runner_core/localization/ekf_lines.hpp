@@ -4,25 +4,32 @@
 
 #include <Eigen/Dense>
 
-#include "maze_runner_core/lines.hpp"
+#include "maze_runner_core/localization/lines.hpp"
 
-namespace maze_runner
+namespace maze_runner::localization
 {
+
+struct EkfLinesConfig
+{
+  // Covariance of the odometry increments [delta_d, delta_theta].
+  Eigen::Matrix2d process_noise = Eigen::Vector2d(4e-6, 4e-6).asDiagonal();
+  // Mahalanobis gate on the 2D innovation (9.21: 99% for 2 DOF).
+  double chi2_threshold = 9.21;
+  // Sideways slip variance per meter traveled [m^2/m]; models motion the unicycle model
+  // can't explain (wheel slip, scraping a wall). 0 disables it.
+  double lateral_variance = 0.0;
+  // Heading slip variance per unit of motion [rad^2 per (m + rad)]; wheel slip shows up
+  // as a wrong delta_theta. 0 disables it.
+  double heading_variance = 0.0;
+};
 
 // EKF localization against a known map of lines. State is [x, y, theta].
 class EkfLines
 {
 public:
-  // process_noise: covariance of the odometry increments [delta_d, delta_theta].
-  // chi2_threshold: Mahalanobis gate on the 2D innovation.
-  // lateral_variance: sideways slip variance per meter traveled [m^2/m]; models motion
-  // the unicycle model can't explain (wheel slip, scraping a wall). 0 disables it.
-  // heading_variance: heading slip variance per unit of motion [rad^2 per (m + rad)];
-  // wheel slip shows up as a wrong delta_theta. 0 disables it.
   EkfLines(
     const Eigen::Vector3d & x0, const Eigen::Matrix3d & P0, std::vector<Line> map,
-    const Eigen::Matrix2d & process_noise, double chi2_threshold, double lateral_variance = 0.0,
-    double heading_variance = 0.0);
+    const EkfLinesConfig & config = {});
 
   // Midpoint odometry model.
   void predict(double delta_d, double delta_theta);
@@ -44,10 +51,7 @@ private:
   Eigen::Vector3d x_;
   Eigen::Matrix3d P_;
   std::vector<Line> map_;
-  Eigen::Matrix2d Q_;
-  double chi2_threshold_;
-  double lateral_variance_;
-  double heading_variance_;
+  EkfLinesConfig cfg_;
 };
 
-}  // namespace maze_runner
+}  // namespace maze_runner::localization

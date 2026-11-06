@@ -17,14 +17,15 @@
 #include <tf2_ros/buffer.hpp>
 #include <tf2_ros/transform_listener.hpp>
 
-#include "maze_runner_core/nmpc_cbf.hpp"
-#include "maze_runner_core/path_tracker.hpp"
-#include "yaw.hpp"
+#include "maze_runner_core/control/nmpc_cbf.hpp"
+#include "maze_runner_core/control/path_tracker.hpp"
+#include "common/yaw.hpp"
 
 namespace
 {
 
 using maze_runner::yaw_of;
+using namespace maze_runner::control;
 
 // Older inputs than these stop the robot: driving on them is driving blind.
 constexpr double kMaxPoseAge = 0.5;  // [s] map -> base (localization alive)
@@ -36,7 +37,7 @@ public:
   NmpcCbfNode()
   : Node("nmpc_cbf")
   {
-    maze_runner::NmpcCbfConfig cfg;
+    NmpcCbfConfig cfg;
     cfg.horizon = static_cast<int>(declare_parameter<int>("horizon", cfg.horizon));
     cfg.dt = declare_parameter<double>("dt", cfg.dt);
     const auto qw = declare_parameter<std::vector<double>>("state_weights", {1000.0, 1000.0, 100.0});
@@ -77,7 +78,7 @@ public:
     for (std::size_t i = 0; i < flat.size(); i += 2) {
       waypoints.emplace_back(flat[i], flat[i + 1]);
     }
-    tracker_.emplace(maze_runner::densify(waypoints, reference_speed * cfg.dt));
+    tracker_.emplace(densify(waypoints, reference_speed * cfg.dt));
     mpc_.emplace(cfg);
     RCLCPP_INFO(
       get_logger(), "Tracking %zu waypoints (%zu reference points), horizon %d, dt %.2f s",
@@ -220,8 +221,8 @@ private:
     path_pub_->publish(msg);
   }
 
-  std::optional<maze_runner::PathTracker> tracker_;
-  std::optional<maze_runner::NmpcCbf> mpc_;
+  std::optional<PathTracker> tracker_;
+  std::optional<NmpcCbf> mpc_;
   std::vector<Eigen::Vector2d> scan_;  // map frame
   std::optional<rclcpp::Time> scan_stamp_;
   double goal_tolerance_;

@@ -1,4 +1,4 @@
-#include "map_loader.hpp"
+#include "localization/world_map_loader.hpp"
 
 #include <cmath>
 #include <filesystem>
@@ -16,9 +16,9 @@
 #include <sdf/Root.hh>
 #include <sdf/World.hh>
 
-#include "maze_runner_core/map_lines.hpp"
+#include "maze_runner_core/localization/map_lines.hpp"
 
-namespace maze_runner
+namespace maze_runner::localization
 {
 namespace
 {
@@ -36,8 +36,7 @@ Eigen::Vector3d compose(const Eigen::Vector3d & a, const gz::math::Pose3d & b)
 
 }  // namespace
 
-LoadedMap load_map_lines(
-  const std::string & path, const std::string & model_name, double min_face_length)
+LoadedMap WorldMapLoader::load(const std::string & path, const std::string & model_name) const
 {
   sdf::Root root;
   const auto errors = root.Load(path);
@@ -91,12 +90,11 @@ LoadedMap load_map_lines(
     }
   }
 
-  LoadedMap out{wall_lines(boxes, min_face_length), boxes.size(), triangles.size()};
-  for (const auto & l : mesh_lines(triangles, min_face_length)) {
+  LoadedMap out{wall_lines(boxes, min_face_length_), boxes.size(), triangles.size()};
+  for (const auto & l : mesh_lines(triangles, min_face_length_)) {
     out.lines.push_back(l);
   }
   return out;
 }
 
-
-}  // namespace maze_runner
+}  // namespace maze_runner::localization

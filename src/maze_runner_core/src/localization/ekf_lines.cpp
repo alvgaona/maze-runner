@@ -1,14 +1,15 @@
-#include "maze_runner_core/ekf_lines.hpp"
+#include "maze_runner_core/localization/ekf_lines.hpp"
+
+#include "maze_runner_core/angles.hpp"
 
 #include <cmath>
 #include <numbers>
 #include <utility>
 
-namespace maze_runner
+namespace maze_runner::localization
 {
 namespace
 {
-
 
 // Association gates and weights, as tuned in the MATLAB version.
 constexpr double kAngleWeight = 2.0;
@@ -20,10 +21,8 @@ constexpr double kMaxDistDiff = 0.5;
 
 EkfLines::EkfLines(
   const Eigen::Vector3d & x0, const Eigen::Matrix3d & P0, std::vector<Line> map,
-  const Eigen::Matrix2d & process_noise, double chi2_threshold, double lateral_variance,
-  double heading_variance)
-: x_(x0), P_(P0), map_(std::move(map)), Q_(process_noise), chi2_threshold_(chi2_threshold),
-  lateral_variance_(lateral_variance), heading_variance_(heading_variance)
+  const EkfLinesConfig & config)
+: x_(x0), P_(P0), map_(std::move(map)), cfg_(config)
 {
 }
 
@@ -47,11 +46,11 @@ void EkfLines::predict(double delta_d, double delta_theta)
        s, 0.5 * delta_d * c,
        0, 1;
 
-  P_ = A * P_ * A.transpose() + W * Q_ * W.transpose();
+  P_ = A * P_ * A.transpose() + W * cfg_.process_noise * W.transpose();
 
   const Eigen::Vector2d lateral(-s, c);
-  P_.topLeftCorner<2, 2>() += lateral_variance_ * std::abs(delta_d) * lateral * lateral.transpose();
-  P_(2, 2) += heading_variance_ * (std::abs(delta_d) + std::abs(delta_theta));
+  P_.topLeftCorner<2, 2>() += cfg_.lateral_variance * std::abs(delta_d) * lateral * lateral.transpose();
+  P_(2, 2) += cfg_.heading_variance * (std::abs(delta_d) + std::abs(delta_theta));
 }
 
 int EkfLines::update(const std::vector<ObservedLine> & observed)
@@ -81,7 +80,7 @@ int EkfLines::update(const std::vector<ObservedLine> & observed)
     const Eigen::Matrix2d S = H * P_ * H.transpose() + R;
     const Eigen::Matrix2d S_inv = S.inverse();
 
-    if (innovation.dot(S_inv * innovation) > chi2_threshold_) {
+    if (innovation.dot(S_inv * innovation) > cfg_.chi2_threshold) {
       continue;
     }
 
@@ -134,4 +133,4 @@ int EkfLines::associate(const ObservedLine & obs) const
   return best;
 }
 
-}  // namespace maze_runner
+}  // namespace maze_runner::localization

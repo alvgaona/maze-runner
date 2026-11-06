@@ -1,10 +1,10 @@
-#include "maze_runner_core/odometry.hpp"
+#include "maze_runner_core/localization/odometry.hpp"
 
-#include "maze_runner_core/lines.hpp"
+#include "maze_runner_core/angles.hpp"
 
 #include <cmath>
 
-namespace maze_runner
+namespace maze_runner::localization
 {
 
 OdometryDelta odometry_delta(const Eigen::Vector3d & prev, const Eigen::Vector3d & curr)
@@ -28,4 +28,4 @@ OdometryDelta odometry_delta(const Eigen::Vector3d & prev, const Eigen::Vector3d
   return {d, dtheta};
 }
 
-}  // namespace maze_runner
+}  // namespace maze_runner::localization

@@ -3,7 +3,6 @@
 
 #include <cmath>
 #include <optional>
-#include <random>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -16,22 +15,23 @@
 #include <tf2_ros/transform_broadcaster.hpp>
 #include <tf2_ros/transform_listener.hpp>
 
-#include "maze_runner_core/ekf_lines.hpp"
-#include "maze_runner_core/odometry.hpp"
-#include "maze_runner_core/ransac_lines.hpp"
-#include "map_loader.hpp"
-#include "yaw.hpp"
+#include "maze_runner_core/localization/ekf_lines.hpp"
+#include "maze_runner_core/localization/odometry.hpp"
+#include "maze_runner_core/localization/ransac_lines.hpp"
+#include "common/yaw.hpp"
+#include "localization/world_map_loader.hpp"
 
 namespace
 {
 
 using maze_runner::yaw_of;
+using namespace maze_runner::localization;
 
 class EkfLinesNode : public rclcpp::Node
 {
 public:
   EkfLinesNode()
-  : Node("ekf_lines"), rng_(0)
+  : Node("ekf_lines")
   {
     const auto world_file = declare_parameter<std::string>("world_file");
     const auto wall_model = declare_parameter<std::string>("wall_model", "maze");
@@ -44,8 +44,8 @@ public:
     // Heading slip std per sqrt(m + rad) of motion; startup wheel slip skews odom heading.
     const auto heading_sigma = declare_parameter<double>("heading_sigma", 0.1);
     const auto min_face = declare_parameter<double>("min_face_length", 0.5);
-    ransac_threshold_ = declare_parameter<double>("ransac_threshold", 0.03);
-    ransac_min_points_ = static_cast<int>(declare_parameter<int>("ransac_min_points", 10));
+    ransac_.distance_threshold = declare_parameter<double>("ransac_threshold", 0.03);
+    ransac_.min_points = static_cast<int>(declare_parameter<int>("ransac_min_points", 10));
     map_frame_ = declare_parameter<std::string>("map_frame", "map");
     base_frame_ = declare_parameter<std::string>("base_frame", "base_footprint");
 
@@ -53,11 +53,11 @@ public:
       throw std::invalid_argument("initial_pose/initial_sigma need 3 values, odom_sigma needs 2");
     }
 
-    if (ransac_min_points_ < 2) {
+    if (ransac_.min_points < 2) {
       throw std::invalid_argument("ransac_min_points must be >= 2 (a line needs two points)");
     }
 
-    auto map = maze_runner::load_map_lines(world_file, wall_model, min_face);
+    auto map = WorldMapLoader(min_face).load(world_file, wall_model);
     RCLCPP_INFO(
       get_logger(), "Map from %s: %zu boxes, %zu mesh triangles -> %zu lines", world_file.c_str(),
       map.boxes, map.triangles, map.lines.size());
@@ -66,8 +66,11 @@ public:
       Eigen::Vector3d(x0[0], x0[1], x0[2]),
       Eigen::Vector3d(s0[0] * s0[0], s0[1] * s0[1], s0[2] * s0[2]).asDiagonal().toDenseMatrix(),
       std::move(map.lines),
-      Eigen::Vector2d(sq[0] * sq[0], sq[1] * sq[1]).asDiagonal().toDenseMatrix(), chi2,
-      lateral_sigma * lateral_sigma, heading_sigma * heading_sigma);
+      EkfLinesConfig{
+        .process_noise = Eigen::Vector2d(sq[0] * sq[0], sq[1] * sq[1]).asDiagonal(),
+        .chi2_threshold = chi2,
+        .lateral_variance = lateral_sigma * lateral_sigma,
+        .heading_variance = heading_sigma * heading_sigma});
 
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(get_clock());
     tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
@@ -88,7 +91,7 @@ private:
     const auto & p = msg.pose.pose;
     const Eigen::Vector3d odom(p.position.x, p.position.y, yaw_of(p.orientation));
     if (last_odom_) {
-      const auto delta = maze_runner::odometry_delta(*last_odom_, odom);
+      const auto delta = odometry_delta(*last_odom_, odom);
       ekf_->predict(delta.d, delta.theta);
     }
     last_odom_ = odom;
@@ -148,8 +151,7 @@ private:
       points.emplace_back(l(0) + r * std::cos(a), l(1) + r * std::sin(a));
     }
 
-    const auto lines = maze_runner::ransac_lines(
-      std::move(points), ransac_threshold_, ransac_min_points_, rng_);
+    const auto lines = ransac_lines(std::move(points), ransac_);
     const int applied = ekf_->update(lines);
     RCLCPP_DEBUG(get_logger(), "scan: %zu lines, %d applied", lines.size(), applied);
   }
@@ -176,13 +178,11 @@ private:
     pose_pub_->publish(out);
   }
 
-  std::optional<maze_runner::EkfLines> ekf_;
+  std::optional<EkfLines> ekf_;
   std::optional<Eigen::Vector3d> last_odom_;
   std::optional<rclcpp::Time> last_odom_stamp_;
   std::string odom_frame_;
-  std::mt19937 rng_;
-  double ransac_threshold_;
-  int ransac_min_points_;
+  RansacConfig ransac_;
   std::string map_frame_;
   std::string base_frame_;
 

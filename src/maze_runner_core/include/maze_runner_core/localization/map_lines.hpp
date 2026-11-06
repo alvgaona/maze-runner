@@ -5,9 +5,9 @@
 
 #include <Eigen/Core>
 
-#include "maze_runner_core/lines.hpp"
+#include "maze_runner_core/localization/lines.hpp"
 
-namespace maze_runner
+namespace maze_runner::localization
 {
 
 // A wall as an axis-aligned box in its own frame, placed at (x, y, yaw) in the world.
@@ -32,4 +32,4 @@ using Triangle = std::array<Eigen::Vector3d, 3>;
 // faces merged, d >= 0. Non-vertical triangles (floors, wall tops) are ignored.
 std::vector<Line> mesh_lines(const std::vector<Triangle> & triangles, double min_face_length = 0.5);
 
-}  // namespace maze_runner
+}  // namespace maze_runner::localization

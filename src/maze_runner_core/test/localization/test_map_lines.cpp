@@ -3,11 +3,11 @@
 
 #include <gtest/gtest.h>
 
-#include "maze_runner_core/map_lines.hpp"
+#include "maze_runner_core/localization/map_lines.hpp"
 
-using maze_runner::Line;
-using maze_runner::wall_lines;
-using maze_runner::WallBox;
+using maze_runner::localization::Line;
+using maze_runner::localization::wall_lines;
+using maze_runner::localization::WallBox;
 
 namespace
 {
@@ -95,11 +95,11 @@ namespace
 {
 
 // The 4 side faces of an axis-aligned box as triangles, plus its top.
-std::vector<maze_runner::Triangle> box_mesh(double x0, double y0, double x1, double y1, double h)
+std::vector<maze_runner::localization::Triangle> box_mesh(double x0, double y0, double x1, double y1, double h)
 {
   const Eigen::Vector3d a(x0, y0, 0), b(x1, y0, 0), c(x1, y1, 0), d(x0, y1, 0);
   const Eigen::Vector3d up(0, 0, h);
-  std::vector<maze_runner::Triangle> tris;
+  std::vector<maze_runner::localization::Triangle> tris;
   for (const auto & [p, q] : {std::pair{a, b}, {b, c}, {c, d}, {d, a}}) {
     tris.push_back({p, q, q + up});
     tris.push_back({p, q + up, p + up});
@@ -113,7 +113,7 @@ std::vector<maze_runner::Triangle> box_mesh(double x0, double y0, double x1, dou
 TEST(MapLines, MeshMatchesEquivalentBoxes)
 {
   // Same wall as SingleWallGivesTwoLongFaces, as a mesh.
-  const auto lines = maze_runner::mesh_lines(box_mesh(0.0, 2.95, 4.0, 3.05, 1.0));
+  const auto lines = maze_runner::localization::mesh_lines(box_mesh(0.0, 2.95, 4.0, 3.05, 1.0));
   ASSERT_EQ(lines.size(), 2u);
   EXPECT_TRUE(has_line(lines, kPi / 2, 3.05));
   EXPECT_TRUE(has_line(lines, kPi / 2, 2.95));
@@ -127,7 +127,7 @@ TEST(MapLines, MeshKeepsThickEndsAndMergesCollinear)
   const auto more = box_mesh(5.0, 0.0, 8.0, 1.0, 2.0);
   tris.insert(tris.end(), more.begin(), more.end());
 
-  const auto lines = maze_runner::mesh_lines(tris);
+  const auto lines = maze_runner::localization::mesh_lines(tris);
   EXPECT_EQ(lines.size(), 6u);
   EXPECT_TRUE(has_line(lines, kPi / 2, 1.0));
   EXPECT_TRUE(has_line(lines, 0.0, 8.0));

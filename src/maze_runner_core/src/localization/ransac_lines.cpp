@@ -1,12 +1,13 @@
-#include "maze_runner_core/ransac_lines.hpp"
+#include "maze_runner_core/localization/ransac_lines.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include <random>
 
 #include <Eigen/Eigenvalues>
 
-namespace maze_runner
+namespace maze_runner::localization
 {
 namespace
 {
@@ -63,19 +64,18 @@ ObservedLine fit_line(const std::vector<Eigen::Vector2d> & pts)
 
 }  // namespace
 
-std::vector<ObservedLine> ransac_lines(
-  std::vector<Eigen::Vector2d> points, double distance_threshold, int min_points,
-  std::mt19937 & rng, int iterations)
+std::vector<ObservedLine> ransac_lines(std::vector<Eigen::Vector2d> points, const RansacConfig & config)
 {
+  std::mt19937 rng(config.seed);
   std::vector<ObservedLine> lines;
   std::vector<char> inliers;
   std::vector<char> best;
 
-  while (static_cast<int>(points.size()) > min_points) {
+  while (static_cast<int>(points.size()) > config.min_points) {
     std::uniform_int_distribution<std::size_t> pick(0, points.size() - 1);
     int best_count = 0;
 
-    for (int it = 0; it < iterations; ++it) {
+    for (int it = 0; it < config.iterations; ++it) {
       const Eigen::Vector2d & p1 = points[pick(rng)];
       const Eigen::Vector2d & p2 = points[pick(rng)];
       const Eigen::Vector2d dp = p2 - p1;
@@ -88,7 +88,7 @@ std::vector<ObservedLine> ransac_lines(
       inliers.assign(points.size(), 0);
       int count = 0;
       for (std::size_t i = 0; i < points.size(); ++i) {
-        if (std::abs(n.dot(points[i]) - d) < distance_threshold) {
+        if (std::abs(n.dot(points[i]) - d) < config.distance_threshold) {
           inliers[i] = 1;
           ++count;
         }
@@ -99,7 +99,7 @@ std::vector<ObservedLine> ransac_lines(
       }
     }
 
-    if (best_count < min_points) {
+    if (best_count < config.min_points) {
       break;
     }
 
@@ -114,4 +114,4 @@ std::vector<ObservedLine> ransac_lines(
   return lines;
 }
 
-}  // namespace maze_runner
+}  // namespace maze_runner::localization

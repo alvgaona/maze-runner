@@ -5,7 +5,7 @@
 
 #include <Eigen/Core>
 
-namespace maze_runner
+namespace maze_runner::control
 {
 
 // Dense path [x, y, theta] through the waypoints, one point every `spacing` meters.
@@ -36,4 +36,4 @@ private:
   bool initialized_ = false;
 };
 
-}  // namespace maze_runner
+}  // namespace maze_runner::control

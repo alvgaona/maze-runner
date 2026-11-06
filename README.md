@@ -9,10 +9,22 @@ ROS 2 Lyrical + Gazebo (Jetty), all C++.
 
 | Package | What it holds |
 |---|---|
-| `maze_runner_core` | Algorithms, no ROS: line EKF, RANSAC line extraction, map lines from walls/meshes, odometry, path tracker, NMPC-CBF (CasADi + IPOPT). Unit tests. |
+| `maze_runner_core` | Algorithms, no ROS. Unit tests. |
 | `maze_runner_nodes` | `ekf_lines_node` (publishes `ekf/pose` and `map -> odom`) and `nmpc_cbf_node` (publishes `diff_drive_controller/cmd_vel`). |
 | `maze_runner_description` | Robot URDF, ros2_control config, meshes (Husarion, Apache-2.0). |
 | `maze_runner_gazebo` | Worlds (`maze.sdf` from the maze STL, `test_maze.sdf`), route, bridge, RViz config, `sim.launch.xml`. |
+
+The C++ packages are split into the same modules, each with its own namespace; `src/`
+and `test/` mirror `include/`:
+
+| Module | `maze_runner_core` | `maze_runner_nodes` |
+|---|---|---|
+| `localization` (`maze_runner::localization`) | line EKF, RANSAC line extraction, map lines from walls/meshes, odometry deltas | `ekf_lines_node`, `WorldMapLoader` (reads walls from a world SDF) |
+| `control` (`maze_runner::control`) | NMPC-CBF (CasADi + IPOPT), path tracker | `nmpc_cbf_node` |
+| shared | `angles.hpp` | `common/yaw.hpp` |
+
+Free functions are pure. Anything with state or I/O is a class: the EKF, path tracker,
+NMPC, map loader and the nodes.
 
 Frames follow REP 105: `map -> odom -> base_footprint -> base_link`.
 

@@ -1,4 +1,6 @@
-#include "maze_runner_core/map_lines.hpp"
+#include "maze_runner_core/localization/map_lines.hpp"
+
+#include "maze_runner_core/angles.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -6,7 +8,7 @@
 
 #include <Eigen/Geometry>
 
-namespace maze_runner
+namespace maze_runner::localization
 {
 namespace
 {
@@ -36,12 +38,17 @@ bool same_line(const Line & a, const Line & b)
          std::abs(a.d - b.d) < kMergeDistTol;
 }
 
-void add_unique(std::vector<Line> & lines, double alpha, double d)
+// The lines in canonical form, without duplicates, in first-seen order.
+std::vector<Line> unique_lines(const std::vector<Line> & lines)
 {
-  const Line line = canonical(alpha, d);
-  if (std::none_of(lines.begin(), lines.end(), [&](const Line & l) { return same_line(l, line); })) {
-    lines.push_back(line);
+  std::vector<Line> out;
+  for (const auto & l : lines) {
+    const Line line = canonical(l.alpha, l.d);
+    if (std::none_of(out.begin(), out.end(), [&](const Line & o) { return same_line(o, line); })) {
+      out.push_back(line);
+    }
   }
+  return out;
 }
 
 }  // namespace
@@ -66,10 +73,10 @@ std::vector<Line> wall_lines(const std::vector<WallBox> & walls, double min_face
       const double alpha = w.yaw + f.angle;
       // d = n . (center + offset * n)
       const double d = std::cos(alpha) * w.x + std::sin(alpha) * w.y + f.offset;
-      add_unique(lines, alpha, d);
+      lines.push_back({alpha, d});
     }
   }
-  return lines;
+  return unique_lines(lines);
 }
 
 std::vector<Line> mesh_lines(const std::vector<Triangle> & triangles, double min_face_length)
@@ -95,9 +102,9 @@ std::vector<Line> mesh_lines(const std::vector<Triangle> & triangles, double min
     if (hi - lo < min_face_length) {
       continue;
     }
-    add_unique(lines, std::atan2(n2.y(), n2.x()), n2.dot(t[0].head<2>()));
+    lines.push_back({std::atan2(n2.y(), n2.x()), n2.dot(t[0].head<2>())});
   }
-  return lines;
+  return unique_lines(lines);
 }
 
-}  // namespace maze_runner
+}  // namespace maze_runner::localization

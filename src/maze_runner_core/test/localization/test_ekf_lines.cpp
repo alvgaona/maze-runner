@@ -3,11 +3,12 @@
 
 #include <gtest/gtest.h>
 
-#include "maze_runner_core/ekf_lines.hpp"
+#include "maze_runner_core/localization/ekf_lines.hpp"
 
-using maze_runner::EkfLines;
-using maze_runner::Line;
-using maze_runner::ObservedLine;
+using maze_runner::localization::EkfLines;
+using maze_runner::localization::EkfLinesConfig;
+using maze_runner::localization::Line;
+using maze_runner::localization::ObservedLine;
 
 namespace
 {
@@ -23,8 +24,7 @@ std::vector<Line> box_map()
 EkfLines make_ekf(const Eigen::Vector3d & x0, double p0 = 0.1)
 {
   return EkfLines(
-    x0, Eigen::Matrix3d::Identity() * p0, box_map(),
-    Eigen::Vector2d(0.01, 0.001).asDiagonal(), 9.21);
+    x0, Eigen::Matrix3d::Identity() * p0, box_map(), {.process_noise = Eigen::Vector2d(0.01, 0.001).asDiagonal()});
 }
 
 // What the robot at `pose` would observe for map line `m`, in canonical form (d >= 0).
@@ -83,9 +83,10 @@ TEST(EkfLines, PredictCovariance)
 TEST(EkfLines, LateralNoiseGrowsSidewaysOnly)
 {
   // Heading +y: sideways is x. 2 m traveled with 0.01 m^2/m adds 0.02 to P(0,0) only.
-  const Eigen::Matrix2d Q = Eigen::Vector2d(0.01, 0.001).asDiagonal();
-  EkfLines plain({0.0, 0.0, kPi / 2}, Eigen::Matrix3d::Identity() * 0.1, box_map(), Q, 9.21);
-  EkfLines slip({0.0, 0.0, kPi / 2}, Eigen::Matrix3d::Identity() * 0.1, box_map(), Q, 9.21, 0.01);
+  EkfLinesConfig cfg{.process_noise = Eigen::Vector2d(0.01, 0.001).asDiagonal()};
+  EkfLines plain({0.0, 0.0, kPi / 2}, Eigen::Matrix3d::Identity() * 0.1, box_map(), cfg);
+  cfg.lateral_variance = 0.01;
+  EkfLines slip({0.0, 0.0, kPi / 2}, Eigen::Matrix3d::Identity() * 0.1, box_map(), cfg);
   plain.predict(-2.0, 0.0);  // reversing counts too
   slip.predict(-2.0, 0.0);
 
@@ -98,9 +99,10 @@ TEST(EkfLines, LateralNoiseGrowsSidewaysOnly)
 TEST(EkfLines, HeadingNoiseGrowsWithMotion)
 {
   // 1 m + 0.5 rad of motion with 0.02 rad^2 per unit adds 0.03 to P(2,2) only.
-  const Eigen::Matrix2d Q = Eigen::Vector2d(0.01, 0.001).asDiagonal();
-  EkfLines plain({0.0, 0.0, 0.0}, Eigen::Matrix3d::Identity() * 0.1, box_map(), Q, 9.21);
-  EkfLines slip({0.0, 0.0, 0.0}, Eigen::Matrix3d::Identity() * 0.1, box_map(), Q, 9.21, 0.0, 0.02);
+  EkfLinesConfig cfg{.process_noise = Eigen::Vector2d(0.01, 0.001).asDiagonal()};
+  EkfLines plain({0.0, 0.0, 0.0}, Eigen::Matrix3d::Identity() * 0.1, box_map(), cfg);
+  cfg.heading_variance = 0.02;
+  EkfLines slip({0.0, 0.0, 0.0}, Eigen::Matrix3d::Identity() * 0.1, box_map(), cfg);
   plain.predict(1.0, -0.5);
   slip.predict(1.0, -0.5);
 
@@ -149,7 +151,7 @@ TEST(EkfLines, MahalanobisGateRejects)
   // Tiny covariance + tiny noise: a 0.3 m error passes association but fails the gate.
   EkfLines ekf(
     {5.0, 5.0, 0.0}, Eigen::Matrix3d::Identity() * 1e-6, box_map(),
-    Eigen::Matrix2d::Identity() * 1e-6, 9.21);
+    {.process_noise = Eigen::Matrix2d::Identity() * 1e-6});
   EXPECT_EQ(ekf.update({{0.0, 5.3, 0.001, 0.001}}), 0);
   EXPECT_EQ(ekf.state(), Eigen::Vector3d(5.0, 5.0, 0.0));
 }

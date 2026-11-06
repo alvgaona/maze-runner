@@ -3,9 +3,9 @@
 
 #include <gtest/gtest.h>
 
-#include "maze_runner_core/odometry.hpp"
+#include "maze_runner_core/localization/odometry.hpp"
 
-using maze_runner::odometry_delta;
+using maze_runner::localization::odometry_delta;
 
 constexpr double kPi = std::numbers::pi;
 

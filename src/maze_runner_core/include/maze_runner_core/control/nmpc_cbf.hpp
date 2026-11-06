@@ -6,9 +6,7 @@
 #include <casadi/casadi.hpp>
 #include <Eigen/Core>
 
-#include "maze_runner_core/lines.hpp"
-
-namespace maze_runner
+namespace maze_runner::control
 {
 
 struct NmpcCbfConfig
@@ -77,4 +75,4 @@ private:
   int obstacle_count_ = 0;
 };
 
-}  // namespace maze_runner
+}  // namespace maze_runner::control

@@ -1,10 +1,10 @@
-#include "maze_runner_core/path_tracker.hpp"
+#include "maze_runner_core/control/path_tracker.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
 
-namespace maze_runner
+namespace maze_runner::control
 {
 
 std::vector<Eigen::Vector3d> densify(const std::vector<Eigen::Vector2d> & waypoints, double spacing)
@@ -66,4 +66,4 @@ bool PathTracker::reached_goal(const Eigen::Vector2d & position, double toleranc
          (path_.back().head<2>() - position).norm() < tolerance;
 }
 
-}  // namespace maze_runner
+}  // namespace maze_runner::control

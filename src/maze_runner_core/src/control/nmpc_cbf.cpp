@@ -1,11 +1,13 @@
-#include "maze_runner_core/nmpc_cbf.hpp"
+#include "maze_runner_core/control/nmpc_cbf.hpp"
+
+#include "maze_runner_core/angles.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
 
-namespace maze_runner
+namespace maze_runner::control
 {
 namespace
 {
@@ -214,4 +216,4 @@ Eigen::Vector2d NmpcCbf::compute(
   return {static_cast<double>(plan_(0, 0)), static_cast<double>(plan_(1, 0))};
 }
 
-}  // namespace maze_runner
+}  // namespace maze_runner::control

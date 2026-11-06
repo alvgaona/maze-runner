@@ -17,14 +17,14 @@ find_package(gz_common_vendor REQUIRED)
 find_package(gz-common REQUIRED COMPONENTS graphics)
 find_package(maze_runner_core REQUIRED)
 
-add_library(map_loader STATIC src/map_loader.cpp)
-target_include_directories(map_loader PUBLIC src)
-target_link_libraries(map_loader PUBLIC maze_runner_core::maze_runner_core sdformat::sdformat gz-common::graphics)
-target_compile_options(map_loader PRIVATE -Wall -Wextra -Wpedantic)
+add_library(world_map_loader STATIC src/localization/world_map_loader.cpp)
+target_include_directories(world_map_loader PUBLIC src)
+target_link_libraries(world_map_loader PUBLIC maze_runner_core::maze_runner_core sdformat::sdformat gz-common::graphics)
+target_compile_options(world_map_loader PRIVATE -Wall -Wextra -Wpedantic)
 
-add_executable(ekf_lines_node src/ekf_lines_node.cpp)
+add_executable(ekf_lines_node src/localization/ekf_lines_node.cpp)
 target_link_libraries(ekf_lines_node
-  map_loader
+  world_map_loader
   rclcpp::rclcpp
   ${geometry_msgs_TARGETS}
   ${nav_msgs_TARGETS}
@@ -33,7 +33,7 @@ target_link_libraries(ekf_lines_node
 )
 target_compile_options(ekf_lines_node PRIVATE -Wall -Wextra -Wpedantic)
 
-add_executable(nmpc_cbf_node src/nmpc_cbf_node.cpp)
+add_executable(nmpc_cbf_node src/control/nmpc_cbf_node.cpp)
 target_link_libraries(nmpc_cbf_node
   maze_runner_core::maze_runner_core
   rclcpp::rclcpp
@@ -43,14 +43,15 @@ target_link_libraries(nmpc_cbf_node
   ${std_msgs_TARGETS}
   tf2_ros::tf2_ros
 )
+target_include_directories(nmpc_cbf_node PRIVATE src)
 target_compile_options(nmpc_cbf_node PRIVATE -Wall -Wextra -Wpedantic)
 
 install(TARGETS ekf_lines_node nmpc_cbf_node DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
-  ament_add_gtest(test_map_loader test/test_map_loader.cpp)
-  target_link_libraries(test_map_loader map_loader)
+  ament_add_gtest(test_world_map_loader test/localization/test_world_map_loader.cpp)
+  target_link_libraries(test_world_map_loader world_map_loader)
 endif()
 
 ament_package()
