@@ -4,7 +4,8 @@ channels = ["robostack-lyrical", "conda-forge"]
 platforms = [{ name = "mac", platform = "osx-arm64", macos = "14.0" }, "linux-64"]
 
 [dependencies]
-ros-lyrical-desktop = "*"
+ros-lyrical-ros-base = "*"
+ros-lyrical-rviz2 = "*"
 ros-lyrical-ros-gz = "*"
 ros-lyrical-gz-ros2-control = "*"
 ros-lyrical-diff-drive-controller = "*"
@@ -20,8 +21,7 @@ c-compiler = "*"
 cxx-compiler = "*"
 
 [activation.env]
-# OpenBLAS here threads through OpenMP; on our small MPC problems that makes IPOPT
-# ~8x slower (120 ms vs 15 ms per solve).
+# With OpenMP threads IPOPT takes 15 ms per solve.
 OMP_NUM_THREADS = "1"
 
 [tasks]
