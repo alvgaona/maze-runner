@@ -1,0 +1,7 @@
+# Goal of the old Apolo trajDirect route. The planner finds the way from the robot's pose.
+planner:
+  ros__parameters:
+    goal: [29.833, 55.901]
+nmpc_cbf:
+  ros__parameters:
+    reference_speed: 0.5

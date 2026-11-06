@@ -8,12 +8,15 @@
 
 #include <gtest/gtest.h>
 
-#include "localization/world_map_loader.hpp"
+#include "common/world_map_loader.hpp"
 #include "maze_runner_core/angles.hpp"
+#include "maze_runner_core/localization/map_lines.hpp"
 
 namespace fs = std::filesystem;
+using maze_runner::WorldMapLoader;
 using maze_runner::localization::Line;
-using maze_runner::localization::WorldMapLoader;
+using maze_runner::localization::mesh_lines;
+using maze_runner::localization::wall_lines;
 
 namespace
 {
@@ -85,23 +88,32 @@ fs::path write_world()
 
 }  // namespace
 
-TEST(MapLoader, BoxAndRelativeScaledMeshInRotatedModel)
+TEST(WorldMapLoader, BoxAndRelativeScaledMeshInRotatedModel)
 {
-  const auto map = WorldMapLoader(0.5).load(write_world().string(), "maze");
-  EXPECT_EQ(map.boxes, 1u);
-  EXPECT_EQ(map.triangles, 12u);
-  ASSERT_EQ(map.lines.size(), 6u);
-  // Box ends up centered at (1, 2) along world y: long faces x = 0.9 and x = 1.1.
-  EXPECT_TRUE(has_line(map.lines, 0.0, 0.9));
-  EXPECT_TRUE(has_line(map.lines, 0.0, 1.1));
+  const auto walls = WorldMapLoader(write_world().string()).load("maze");
+  ASSERT_EQ(walls.boxes.size(), 1u);
+  EXPECT_EQ(walls.triangles.size(), 12u);
+  // Box ends up centered at (1, 2), along world y.
+  EXPECT_NEAR(walls.boxes[0].x, 1.0, 1e-9);
+  EXPECT_NEAR(walls.boxes[0].y, 2.0, 1e-9);
+  EXPECT_NEAR(walls.boxes[0].yaw, kPi / 2, 1e-9);
+
+  auto lines = wall_lines(walls.boxes, 0.5);
+  for (const auto & l : mesh_lines(walls.triangles, 0.5)) {
+    lines.push_back(l);
+  }
+  ASSERT_EQ(lines.size(), 6u);
+  // Box long faces x = 0.9 and x = 1.1.
+  EXPECT_TRUE(has_line(lines, 0.0, 0.9));
+  EXPECT_TRUE(has_line(lines, 0.0, 1.1));
   // Cube becomes x in [-1, 1], y in [0, 2].
-  EXPECT_TRUE(has_line(map.lines, 0.0, 1.0));
-  EXPECT_TRUE(has_line(map.lines, kPi, 1.0));
-  EXPECT_TRUE(has_line(map.lines, kPi / 2, 2.0));
-  EXPECT_TRUE(has_line(map.lines, kPi / 2, 0.0));
+  EXPECT_TRUE(has_line(lines, 0.0, 1.0));
+  EXPECT_TRUE(has_line(lines, kPi, 1.0));
+  EXPECT_TRUE(has_line(lines, kPi / 2, 2.0));
+  EXPECT_TRUE(has_line(lines, kPi / 2, 0.0));
 }
 
-TEST(MapLoader, MissingModelThrows)
+TEST(WorldMapLoader, MissingModelThrows)
 {
-  EXPECT_THROW(WorldMapLoader(0.5).load(write_world().string(), "nope"), std::runtime_error);
+  EXPECT_THROW(WorldMapLoader(write_world().string()).load("nope"), std::runtime_error);
 }

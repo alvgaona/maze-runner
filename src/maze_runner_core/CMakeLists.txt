@@ -15,6 +15,10 @@ add_library(${PROJECT_NAME}
   src/localization/odometry.cpp
   src/control/nmpc_cbf.cpp
   src/control/path_tracker.cpp
+  src/planning/occupancy_grid.cpp
+  src/planning/astar.cpp
+  src/planning/hybrid_astar.cpp
+  src/walls.cpp
 )
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -47,6 +51,8 @@ if(BUILD_TESTING)
   target_link_libraries(test_path_tracker ${PROJECT_NAME})
   ament_add_gtest(test_nmpc_cbf test/control/test_nmpc_cbf.cpp TIMEOUT 120)
   target_link_libraries(test_nmpc_cbf ${PROJECT_NAME})
+  ament_add_gtest(test_planning test/planning/test_planning.cpp)
+  target_link_libraries(test_planning ${PROJECT_NAME})
 endif()
 
 ament_package()

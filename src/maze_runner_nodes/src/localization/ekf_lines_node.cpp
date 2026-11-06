@@ -16,10 +16,11 @@
 #include <tf2_ros/transform_listener.hpp>
 
 #include "maze_runner_core/localization/ekf_lines.hpp"
+#include "maze_runner_core/localization/map_lines.hpp"
 #include "maze_runner_core/localization/odometry.hpp"
 #include "maze_runner_core/localization/ransac_lines.hpp"
+#include "common/world_map_loader.hpp"
 #include "common/yaw.hpp"
-#include "localization/world_map_loader.hpp"
 
 namespace
 {
@@ -57,15 +58,19 @@ public:
       throw std::invalid_argument("ransac_min_points must be >= 2 (a line needs two points)");
     }
 
-    auto map = WorldMapLoader(min_face).load(world_file, wall_model);
+    const auto walls = maze_runner::WorldMapLoader(world_file).load(wall_model);
+    auto lines = wall_lines(walls.boxes, min_face);
+    for (const auto & l : mesh_lines(walls.triangles, min_face)) {
+      lines.push_back(l);
+    }
     RCLCPP_INFO(
       get_logger(), "Map from %s: %zu boxes, %zu mesh triangles -> %zu lines", world_file.c_str(),
-      map.boxes, map.triangles, map.lines.size());
+      walls.boxes.size(), walls.triangles.size(), lines.size());
 
     ekf_.emplace(
       Eigen::Vector3d(x0[0], x0[1], x0[2]),
       Eigen::Vector3d(s0[0] * s0[0], s0[1] * s0[1], s0[2] * s0[2]).asDiagonal().toDenseMatrix(),
-      std::move(map.lines),
+      std::move(lines),
       EkfLinesConfig{
         .process_noise = Eigen::Vector2d(sq[0] * sq[0], sq[1] * sq[1]).asDiagonal(),
         .chi2_threshold = chi2,

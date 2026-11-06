@@ -41,6 +41,13 @@ Visualization Manager:
       Topic:
         Value: /nmpc/reference
         Durability Policy: Transient Local
+    - Class: rviz_default_plugins/Path
+      Name: Plan
+      Enabled: true
+      Color: 255; 170; 0
+      Topic:
+        Value: /plan
+        Durability Policy: Transient Local
   Views:
     Current:
       Class: rviz_default_plugins/TopDownOrtho

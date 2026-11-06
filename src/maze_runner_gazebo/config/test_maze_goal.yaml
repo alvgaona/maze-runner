@@ -1,0 +1,7 @@
+# Far corner of test_maze.sdf, at the end of the upper corridor.
+planner:
+  ros__parameters:
+    goal: [8.5, 8.5]
+nmpc_cbf:
+  ros__parameters:
+    reference_speed: 0.5

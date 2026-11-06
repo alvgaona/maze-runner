@@ -3,9 +3,10 @@
   <arg name="gui" default="true"/>
   <arg name="rviz" default="true"/>
   <arg name="localization" default="true"/>
-  <!-- Path following needs localization (map -> odom) -->
+  <!-- Planning and path following need localization (map -> odom) -->
   <arg name="controller" default="false"/>
-  <arg name="path" default="$(find-pkg-share maze_runner_gazebo)/config/maze_path.yaml"/>
+  <arg name="planner" default="astar_shortcut"/>
+  <arg name="goal" default="$(find-pkg-share maze_runner_gazebo)/config/maze_goal.yaml"/>
   <!-- Default start: first point of the Apolo trajDirect route -->
   <arg name="x" default="2.393"/>
   <arg name="y" default="4.307"/>
@@ -45,8 +46,15 @@
     <param name="use_sim_time" value="true"/>
   </node>
 
+  <node pkg="maze_runner_nodes" exec="planner_node" output="screen" if="$(var localization)">
+    <param from="$(var goal)"/>
+    <param name="world_file" value="$(var world)"/>
+    <param name="planner" value="$(var planner)"/>
+    <param name="use_sim_time" value="true"/>
+  </node>
+
   <node pkg="maze_runner_nodes" exec="nmpc_cbf_node" output="screen" if="$(var controller)">
-    <param from="$(var path)"/>
+    <param from="$(var goal)"/>
     <param name="use_sim_time" value="true"/>
   </node>
 
@@ -60,5 +68,5 @@
                    /clock /tf /tf_static /scan /joint_states
                    /ground_truth/odom /ekf/pose /diff_drive_controller/odom
                    /diff_drive_controller/cmd_vel /diff_drive_controller/cmd_vel_out
-                   /nmpc/reference /nmpc/solve_time_ms"/>
+                   /plan /nmpc/reference /nmpc/solve_time_ms"/>
 </launch>
