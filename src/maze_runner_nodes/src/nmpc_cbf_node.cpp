@@ -39,24 +39,27 @@ public:
     cfg.dt = declare_parameter<double>("dt", cfg.dt);
     const auto qw = declare_parameter<std::vector<double>>("state_weights", {1000.0, 1000.0, 100.0});
     const auto rw = declare_parameter<std::vector<double>>("control_weights", {1.0, 1.0});
+    const auto rdw = declare_parameter<std::vector<double>>(
+      "control_rate_weights", {cfg.control_rate_weights(0), cfg.control_rate_weights(1)});
     cfg.v_min = declare_parameter<double>("v_min", cfg.v_min);
     cfg.v_max = declare_parameter<double>("v_max", cfg.v_max);
     cfg.omega_min = declare_parameter<double>("omega_min", cfg.omega_min);
     cfg.omega_max = declare_parameter<double>("omega_max", cfg.omega_max);
     cfg.safety_radius = declare_parameter<double>("safety_radius", cfg.safety_radius);
-    cfg.alpha_cbf = declare_parameter<double>("alpha_cbf", cfg.alpha_cbf);
+    cfg.cbf_gamma = declare_parameter<double>("cbf_gamma", cfg.cbf_gamma);
     cfg.constraint_range = declare_parameter<double>("constraint_range", cfg.constraint_range);
     cfg.fov = declare_parameter<double>("fov", cfg.fov);
-    cfg.scan_downsample = static_cast<int>(declare_parameter<int>("scan_downsample", cfg.scan_downsample));
     cfg.max_obstacles = static_cast<int>(declare_parameter<int>("max_obstacles", cfg.max_obstacles));
     cfg.use_slack = declare_parameter<bool>("use_slack", cfg.use_slack);
     cfg.slack_penalty = declare_parameter<double>("slack_penalty", cfg.slack_penalty);
     cfg.max_iterations = static_cast<int>(declare_parameter<int>("max_iterations", cfg.max_iterations));
-    if (qw.size() != 3 || rw.size() != 2) {
-      throw std::invalid_argument("state_weights needs 3 values, control_weights needs 2");
+    if (qw.size() != 3 || rw.size() != 2 || rdw.size() != 2) {
+      throw std::invalid_argument(
+        "state_weights needs 3 values, control_weights and control_rate_weights need 2");
     }
     cfg.state_weights = {qw[0], qw[1], qw[2]};
     cfg.control_weights = {rw[0], rw[1]};
+    cfg.control_rate_weights = {rdw[0], rdw[1]};
 
     // Path: flat [x0, y0, x1, y1, ...] in the map frame, sampled at reference_speed * dt so
     // consecutive reference points are one control step apart.
