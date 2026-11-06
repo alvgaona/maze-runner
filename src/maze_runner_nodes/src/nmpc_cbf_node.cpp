@@ -63,6 +63,10 @@ public:
     const auto flat = declare_parameter<std::vector<double>>("waypoints");
     const double reference_speed = declare_parameter<double>("reference_speed", 0.5);
     goal_tolerance_ = declare_parameter<double>("goal_tolerance", 0.15);
+    // Reference starts this far ahead of the closest path point. Any lead makes the NMPC
+    // chase a gap that never closes, so it runs at v_max instead of reference_speed.
+    const double lookahead = declare_parameter<double>("lookahead", 0.0);
+    const double waypoint_threshold = declare_parameter<double>("waypoint_threshold", 0.0);
     map_frame_ = declare_parameter<std::string>("map_frame", "map");
     base_frame_ = declare_parameter<std::string>("base_frame", "base_footprint");
     if (flat.size() < 4 || flat.size() % 2 != 0) {
@@ -72,7 +76,8 @@ public:
     for (std::size_t i = 0; i < flat.size(); i += 2) {
       waypoints.emplace_back(flat[i], flat[i + 1]);
     }
-    tracker_.emplace(maze_runner::densify(waypoints, reference_speed * cfg.dt));
+    tracker_.emplace(
+      maze_runner::densify(waypoints, reference_speed * cfg.dt), waypoint_threshold, 200, lookahead);
     mpc_.emplace(cfg);
     RCLCPP_INFO(
       get_logger(), "Tracking %zu waypoints (%zu reference points), horizon %d, dt %.2f s",

@@ -16,6 +16,12 @@ diff_drive_controller:
     # separation 2 * (lx + ly) = 2 * (0.085 + 0.135). Keep in sync with the URDF.
     wheel_separation: 0.44
     wheel_radius: 0.05
+    # Calibrated against Gazebo ground truth (bags maze_20261106_005525 at 1 m/s, 010203 at
+    # 0.5 m/s). Slip is speed dependent; separation is tuned for 0.5 m/s. The fake mecanum
+    # friction makes the robot travel ~9% less and turn ~13% more than nominal odometry says.
+    left_wheel_radius_multiplier: 0.907
+    right_wheel_radius_multiplier: 0.907
+    wheel_separation_multiplier: 0.85
 
     odom_frame_id: odom
     base_frame_id: base_footprint
