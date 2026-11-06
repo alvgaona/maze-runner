@@ -1,34 +1,59 @@
-# Maze Runner: A Differential Mobile Robot for Maze Navigation
+# Maze Runner
 
-## Prerequisites
+A Husarion ROSbot XL (mecanum wheels driven as a differential robot, RPLIDAR S3) that
+localizes with a line-based EKF and follows a route through a maze with an NMPC controller
+whose control barrier function (CBF) keeps it clear of walls and obstacles.
+ROS 2 Lyrical + Gazebo (Jetty), all C++.
 
-- MATLAB (>=R2023b)
-- [CasAdi for MATLAB](https://github.com/casadi/casadi/releases/tag/3.7.2)
-- [Apolo](https://github.com/mhernando/Apolo) for any scripts under the [apolo](/apolo)
-folder, as these are integrated with the simulator.
+## Packages
 
-## Usage
+| Package | What it holds |
+|---|---|
+| `maze_runner_core` | Algorithms, no ROS: line EKF, RANSAC line extraction, map lines from walls/meshes, odometry, path tracker, NMPC-CBF (CasADi + IPOPT). Unit tests. |
+| `maze_runner_nodes` | `ekf_lines_node` (publishes `ekf/pose` and `map -> odom`) and `nmpc_cbf_node` (publishes `diff_drive_controller/cmd_vel`). |
+| `maze_runner_description` | Robot URDF, ros2_control config, meshes (Husarion, Apache-2.0). |
+| `maze_runner_gazebo` | Worlds (`maze.sdf` from the maze STL, `test_maze.sdf`), route, bridge, RViz config, `sim.launch.xml`. |
 
-Maze Runnner can be simulated with a Apolo (3D simulator) or standalone MATLAB with fewer capabilities.
+Frames follow REP 105: `map -> odom -> base_footprint -> base_link`.
 
-### Apolo and MATLAB
+## Setup
 
-The very first thing to do is to pull up Apolo.
-Opening the desired world is necessary for the MATLAB scripts to integrate with it.
-The recommended Apolo world is [`MazeRunnerSimple.mwf`](apolo/world/MazeRunnerSimple.mwf).
-A maze (garden) and the mobile robot should be visible and placed correctly.
+Needs [pixi](https://pixi.sh); everything else (ROS 2 from RoboStack, Gazebo, CasADi) comes
+from `pixi.toml`.
 
-At this point, MATLAB is the second part of this.
-All scripts and algorithms that interact directly with Apolo are in the `apolo/` directory of the project.
-It leverages other modules, e.g., control, dynamics, planning; these modules can be used without Apolo.
-The entry point of this simulation should be [`apolo_full_lines.m`](apolo/apolo_full_lines.m), which connects
-everything and even shows visual plots related to the simulation.
-It has several parameters but most of the default ones should work out of the box.
+```bash
+pixi run build   # colcon build
+pixi run test    # unit tests
+```
 
-### Standalone MATLAB
+## Run
 
-Standalone [scripts](standalone/) are simulations based entirely on MATLAB.
-These scripts are essentially built to tests algorithms and integrations without relying on Apolo.
-The nonlinear MPC is mostly implemented in CasAdi so the folder downloaded from
-[casadi/casadi](https://github.com/casadi/casadi) release needs to be added to the MATLAB path.
+```bash
+pixi shell
+source install/setup.bash
+ros2 launch maze_runner_gazebo sim.launch.xml            # sim, localization, RViz, Gazebo GUI
+ros2 run maze_runner_nodes nmpc_cbf_node --ros-args \
+  --params-file install/maze_runner_gazebo/share/maze_runner_gazebo/config/maze_path.yaml \
+  -p use_sim_time:=true                                  # start driving
+```
 
+The Gazebo server runs headless and the GUI as a separate process (`gz sim -g`). On macOS,
+if the GUI fails to load Metal, start it yourself with
+`gz sim -g --render-engine-gui-api-backend opengl` and launch with `gui:=false`.
+
+Launch arguments: `world`, `gui`, `rviz`, `localization`, `controller` (start the NMPC from
+the launch), `path`, start pose `x y yaw`, and `bag:=<dir>` to record a run.
+
+## Recording a run
+
+`bag:=bags/<name>` records ground truth, EKF pose, odometry, commands (sent and rate-limited),
+scans, TF, the reference path and NMPC solve times. Stop the launch with Ctrl-C so the bag is
+closed properly (or run `ros2 bag reindex <dir> -s mcap` if it was killed).
+
+## Notes
+
+- The controller stops if its pose is older than 0.5 s or its scan older than 0.3 s.
+- A route fully blocked by an obstacle makes the robot stop in front of it: going around
+  needs a planner, which this stack does not have.
+- Wheel odometry multipliers in `controllers.yaml` are calibrated to Gazebo's mecanum
+  friction approximation; calibrate again on a real robot.

@@ -6,6 +6,8 @@
 #include <casadi/casadi.hpp>
 #include <Eigen/Core>
 
+#include "maze_runner_core/lines.hpp"
+
 namespace maze_runner
 {
 
@@ -36,14 +38,7 @@ struct NmpcCbfConfig
   int max_iterations = 100;
 };
 
-// Lidar point in the robot frame, polar.
-struct ScanPoint
-{
-  double range;
-  double bearing;
-};
-
-// Nonlinear MPC on the unicycle model with high-order CBF constraints from lidar points.
+// Nonlinear MPC on the unicycle model with discrete-time CBF constraints from lidar points.
 // The NLP is built once; obstacles fill a fixed number of parameter slots.
 class NmpcCbf
 {
@@ -51,15 +46,16 @@ public:
   explicit NmpcCbf(const NmpcCbfConfig & config = {});
 
   // x: [x, y, theta]. xref: reference poses, one per step starting now; padded with
-  // its last pose up to horizon + 1. Returns [v, omega].
+  // its last pose up to horizon + 1. obstacles: lidar points in the same (map) frame as x,
+  // so their position stays right however old the scan is relative to x. Returns [v, omega].
   Eigen::Vector2d compute(
     const Eigen::Vector3d & x, const std::vector<Eigen::Vector3d> & xref,
-    const std::vector<ScanPoint> & scan);
+    const std::vector<Eigen::Vector2d> & obstacles);
 
   // Whether the last compute() converged; if not, it followed the previous plan (and stops
   // after a few failures in a row).
   bool last_solve_succeeded() const { return succeeded_; }
-  // Number of scan points used as constraints in the last compute().
+  // Number of lidar points used as constraints in the last compute().
   int last_obstacle_count() const { return obstacle_count_; }
 
   void reset();
@@ -67,7 +63,8 @@ public:
 private:
   // Nearest point in each of max_obstacles equal sectors of the fov, within range, so a
   // long wall can't take every slot and hide a smaller obstacle.
-  std::vector<ScanPoint> select_obstacles(const std::vector<ScanPoint> & scan) const;
+  std::vector<Eigen::Vector2d> select_obstacles(
+    const Eigen::Vector3d & x, const std::vector<Eigen::Vector2d> & points) const;
 
   NmpcCbfConfig cfg_;
   casadi::Opti opti_;

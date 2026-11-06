@@ -34,11 +34,8 @@ std::vector<Eigen::Vector3d> densify(const std::vector<Eigen::Vector2d> & waypoi
   return path;
 }
 
-PathTracker::PathTracker(
-  std::vector<Eigen::Vector3d> path, double waypoint_threshold, std::size_t search_window,
-  double lookahead)
-: path_(std::move(path)), waypoint_threshold_(waypoint_threshold),
-  search_window_(search_window), lookahead_(lookahead)
+PathTracker::PathTracker(std::vector<Eigen::Vector3d> path, std::size_t search_window)
+: path_(std::move(path)), search_window_(search_window)
 {
   if (path_.empty()) {
     throw std::invalid_argument("PathTracker: empty path");
@@ -60,18 +57,7 @@ std::size_t PathTracker::update(const Eigen::Vector2d & position)
   }
   ref_idx_ = best;
   initialized_ = true;
-
-  while (ref_idx_ < last && dist(ref_idx_) < waypoint_threshold_) {
-    ++ref_idx_;
-  }
-
-  std::size_t track = ref_idx_;
-  double ahead = 0.0;
-  while (track < last && ahead < lookahead_) {
-    ahead += (path_[track + 1].head<2>() - path_[track].head<2>()).norm();
-    ++track;
-  }
-  return track;
+  return ref_idx_;
 }
 
 bool PathTracker::reached_goal(const Eigen::Vector2d & position, double tolerance) const

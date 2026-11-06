@@ -19,14 +19,16 @@
 
 #include "maze_runner_core/nmpc_cbf.hpp"
 #include "maze_runner_core/path_tracker.hpp"
+#include "yaw.hpp"
 
 namespace
 {
 
-double yaw_of(const geometry_msgs::msg::Quaternion & q)
-{
-  return std::atan2(2.0 * (q.w * q.z + q.x * q.y), 1.0 - 2.0 * (q.y * q.y + q.z * q.z));
-}
+using maze_runner::yaw_of;
+
+// Older inputs than these stop the robot: driving on them is driving blind.
+constexpr double kMaxPoseAge = 0.5;  // [s] map -> base (localization alive)
+constexpr double kMaxScanAge = 0.3;  // [s]
 
 class NmpcCbfNode : public rclcpp::Node
 {
@@ -66,10 +68,6 @@ public:
     const auto flat = declare_parameter<std::vector<double>>("waypoints");
     const double reference_speed = declare_parameter<double>("reference_speed", 0.5);
     goal_tolerance_ = declare_parameter<double>("goal_tolerance", 0.15);
-    // Reference starts this far ahead of the closest path point. Any lead makes the NMPC
-    // chase a gap that never closes, so it runs at v_max instead of reference_speed.
-    const double lookahead = declare_parameter<double>("lookahead", 0.0);
-    const double waypoint_threshold = declare_parameter<double>("waypoint_threshold", 0.0);
     map_frame_ = declare_parameter<std::string>("map_frame", "map");
     base_frame_ = declare_parameter<std::string>("base_frame", "base_footprint");
     if (flat.size() < 4 || flat.size() % 2 != 0) {
@@ -79,8 +77,7 @@ public:
     for (std::size_t i = 0; i < flat.size(); i += 2) {
       waypoints.emplace_back(flat[i], flat[i + 1]);
     }
-    tracker_.emplace(
-      maze_runner::densify(waypoints, reference_speed * cfg.dt), waypoint_threshold, 200, lookahead);
+    tracker_.emplace(maze_runner::densify(waypoints, reference_speed * cfg.dt));
     mpc_.emplace(cfg);
     RCLCPP_INFO(
       get_logger(), "Tracking %zu waypoints (%zu reference points), horizon %d, dt %.2f s",
@@ -104,14 +101,16 @@ public:
   }
 
 private:
-  // Scan points relative to the robot center, as the CBF expects.
+  // Scan points in the map frame, using the pose at scan time: they stay put however much
+  // the robot moves before the next solve.
   void on_scan(const sensor_msgs::msg::LaserScan & msg)
   {
     geometry_msgs::msg::TransformStamped t;
     try {
-      t = tf_buffer_->lookupTransform(base_frame_, msg.header.frame_id, tf2::TimePointZero);
+      t = tf_buffer_->lookupTransform(
+        map_frame_, msg.header.frame_id, msg.header.stamp, rclcpp::Duration::from_seconds(0.05));
     } catch (const tf2::TransformException & e) {
-      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "Waiting for lidar TF: %s", e.what());
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "Skipping scan, no TF: %s", e.what());
       return;
     }
     const double lx = t.transform.translation.x;
@@ -125,10 +124,9 @@ private:
         continue;
       }
       const double a = lyaw + msg.angle_min + static_cast<double>(i) * msg.angle_increment;
-      const double px = lx + r * std::cos(a);
-      const double py = ly + r * std::sin(a);
-      scan_.push_back({std::hypot(px, py), std::atan2(py, px)});
+      scan_.emplace_back(lx + r * std::cos(a), ly + r * std::sin(a));
     }
+    scan_stamp_ = msg.header.stamp;
   }
 
   void on_timer()
@@ -142,6 +140,18 @@ private:
     }
     const Eigen::Vector3d x(
       t.transform.translation.x, t.transform.translation.y, yaw_of(t.transform.rotation));
+
+    if (const double age = (now() - rclcpp::Time(t.header.stamp)).seconds(); age > kMaxPoseAge) {
+      RCLCPP_WARN_THROTTLE(
+        get_logger(), *get_clock(), 2000, "Pose is %.1f s old (localization down?), stopping", age);
+      stop();
+      return;
+    }
+    if (!scan_stamp_ || (now() - *scan_stamp_).seconds() > kMaxScanAge) {
+      RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 2000, "No recent scan, stopping");
+      stop();
+      return;
+    }
 
     if (done_ || tracker_->reached_goal(x.head<2>(), goal_tolerance_)) {
       if (!done_) {
@@ -164,7 +174,7 @@ private:
     solve_time_pub_->publish(std_msgs::msg::Float64().set__data(ms));
 
     if (!mpc_->last_solve_succeeded()) {
-      RCLCPP_WARN(get_logger(), "NMPC did not converge, reusing last command");
+      RCLCPP_WARN(get_logger(), "NMPC did not converge, following last plan (stops after 5 in a row)");
     }
     solve_ms_sum_ += ms;
     solve_ms_max_ = std::max(solve_ms_max_, ms);
@@ -175,6 +185,12 @@ private:
       solve_ms_sum_ = 0.0;
       solve_ms_max_ = 0.0;
     }
+  }
+
+  void stop()
+  {
+    publish_cmd(0.0, 0.0);
+    mpc_->reset();  // the old plan no longer matches what was sent
   }
 
   void publish_cmd(double v, double w)
@@ -206,7 +222,8 @@ private:
 
   std::optional<maze_runner::PathTracker> tracker_;
   std::optional<maze_runner::NmpcCbf> mpc_;
-  std::vector<maze_runner::ScanPoint> scan_;
+  std::vector<Eigen::Vector2d> scan_;  // map frame
+  std::optional<rclcpp::Time> scan_stamp_;
   double goal_tolerance_;
   std::string map_frame_;
   std::string base_frame_;

@@ -9,7 +9,6 @@ namespace maze_runner
 namespace
 {
 
-double wrap_angle(double a) { return std::atan2(std::sin(a), std::cos(a)); }
 
 // Association gates and weights, as tuned in the MATLAB version.
 constexpr double kAngleWeight = 2.0;

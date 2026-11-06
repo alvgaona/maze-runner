@@ -17,11 +17,11 @@ std::vector<Eigen::Vector3d> densify(const std::vector<Eigen::Vector2d> & waypoi
 class PathTracker
 {
 public:
-  explicit PathTracker(
-    std::vector<Eigen::Vector3d> path, double waypoint_threshold = 0.1,
-    std::size_t search_window = 200, double lookahead = 0.5);
+  explicit PathTracker(std::vector<Eigen::Vector3d> path, std::size_t search_window = 200);
 
-  // Advance with the current position; returns the index the controller should track from.
+  // Advance to the closest path point (never backward) and return its index. The NMPC tracks
+  // the path from there: points are one control step apart, so any lead makes it outrun
+  // reference_speed.
   std::size_t update(const Eigen::Vector2d & position);
 
   // True once the closest point is the end of the path and the robot is within tolerance.
@@ -31,9 +31,7 @@ public:
 
 private:
   std::vector<Eigen::Vector3d> path_;
-  double waypoint_threshold_;
   std::size_t search_window_;
-  double lookahead_;
   std::size_t ref_idx_ = 0;
   bool initialized_ = false;
 };

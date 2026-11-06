@@ -15,7 +15,6 @@ constexpr double kPi = std::numbers::pi;
 constexpr double kMergeAngleTol = 1e-6;  // [rad]
 constexpr double kMergeDistTol = 1e-3;   // [m]
 
-double wrap_angle(double a) { return std::atan2(std::sin(a), std::cos(a)); }
 
 // Unique representation: d >= 0, and alpha in [0, pi) when the line passes through the origin.
 Line canonical(double alpha, double d)

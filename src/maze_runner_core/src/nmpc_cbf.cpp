@@ -15,7 +15,6 @@ constexpr double kFarAway = 100.0;
 // Consecutive failed solves to ride out on the previous plan before stopping.
 constexpr int kMaxFailures = 5;
 
-double wrap_angle(double a) { return std::atan2(std::sin(a), std::cos(a)); }
 
 }  // namespace
 
@@ -99,6 +98,8 @@ NmpcCbf::NmpcCbf(const NmpcCbfConfig & config)
   opts["ipopt.print_level"] = 0;
   opts["ipopt.sb"] = "yes";
   opts["ipopt.max_iter"] = cfg_.max_iterations;
+  // A late command is worse than a failed solve: the fallback follows the last plan.
+  opts["ipopt.max_cpu_time"] = 0.8 * cfg_.dt;
   opts["ipopt.acceptable_tol"] = 1e-6;
   opts["ipopt.acceptable_obj_change_tol"] = 1e-6;
   opts["ipopt.warm_start_init_point"] = "yes";
@@ -117,27 +118,38 @@ void NmpcCbf::reset()
   failures_ = 0;
 }
 
-std::vector<ScanPoint> NmpcCbf::select_obstacles(const std::vector<ScanPoint> & scan) const
+std::vector<Eigen::Vector2d> NmpcCbf::select_obstacles(
+  const Eigen::Vector3d & x, const std::vector<Eigen::Vector2d> & points) const
 {
   const int M = cfg_.max_obstacles;
-  std::vector<ScanPoint> nearest(M, {std::numeric_limits<double>::infinity(), 0.0});
-  for (const auto & p : scan) {
-    const double b = wrap_angle(p.bearing);
-    if (!std::isfinite(p.range) || p.range >= cfg_.constraint_range || std::abs(b) > cfg_.fov) {
+  std::vector<double> best_range(M, std::numeric_limits<double>::infinity());
+  std::vector<Eigen::Vector2d> nearest(M);
+  for (const auto & p : points) {
+    const Eigen::Vector2d rel = p - x.head<2>();
+    const double range = rel.norm();
+    const double bearing = wrap_angle(std::atan2(rel.y(), rel.x()) - x(2));
+    if (!std::isfinite(range) || range >= cfg_.constraint_range || std::abs(bearing) > cfg_.fov) {
       continue;
     }
-    const int sector = std::clamp(static_cast<int>((b + cfg_.fov) / (2.0 * cfg_.fov) * M), 0, M - 1);
-    if (p.range < nearest[sector].range) {
+    const int sector =
+      std::clamp(static_cast<int>((bearing + cfg_.fov) / (2.0 * cfg_.fov) * M), 0, M - 1);
+    if (range < best_range[sector]) {
+      best_range[sector] = range;
       nearest[sector] = p;
     }
   }
-  std::erase_if(nearest, [](const ScanPoint & p) { return !std::isfinite(p.range); });
-  return nearest;
+  std::vector<Eigen::Vector2d> selected;
+  for (int i = 0; i < M; ++i) {
+    if (std::isfinite(best_range[i])) {
+      selected.push_back(nearest[i]);
+    }
+  }
+  return selected;
 }
 
 Eigen::Vector2d NmpcCbf::compute(
   const Eigen::Vector3d & x, const std::vector<Eigen::Vector3d> & xref,
-  const std::vector<ScanPoint> & scan)
+  const std::vector<Eigen::Vector2d> & obstacles_world)
 {
   if (xref.empty()) {
     throw std::invalid_argument("NmpcCbf::compute: empty reference");
@@ -157,18 +169,13 @@ Eigen::Vector2d NmpcCbf::compute(
     ref(2, k) = prev_heading;
   }
 
-  const auto obstacles = select_obstacles(scan);
+  const auto obstacles = select_obstacles(x, obstacles_world);
   obstacle_count_ = static_cast<int>(obstacles.size());
-  // To world frame: the barrier is evaluated on predicted world positions.
   casadi::DM points = casadi::DM::zeros(2, M);
   for (int i = 0; i < M; ++i) {
-    points(0, i) = x(0) + kFarAway;
-    points(1, i) = x(1);
-  }
-  for (std::size_t i = 0; i < obstacles.size(); ++i) {
-    const double a = x(2) + obstacles[i].bearing;
-    points(0, i) = x(0) + obstacles[i].range * std::cos(a);
-    points(1, i) = x(1) + obstacles[i].range * std::sin(a);
+    const bool used = i < obstacle_count_;
+    points(0, i) = used ? obstacles[i].x() : x(0) + kFarAway;
+    points(1, i) = used ? obstacles[i].y() : x(1);
   }
 
   // Initial guess: last plan shifted one step, and the states it produces from x. The

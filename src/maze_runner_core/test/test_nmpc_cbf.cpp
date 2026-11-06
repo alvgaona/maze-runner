@@ -11,7 +11,6 @@
 
 using maze_runner::NmpcCbf;
 using maze_runner::NmpcCbfConfig;
-using maze_runner::ScanPoint;
 
 namespace
 {
@@ -76,11 +75,9 @@ TEST(NmpcCbf, StopsBeforeWallAcrossPath)
   NmpcCbf mpc(cfg);
   Eigen::Vector3d x(0.0, 0.0, 0.0);
   for (int step = 0; step < 100; ++step) {
-    std::vector<ScanPoint> scan;
+    std::vector<Eigen::Vector2d> scan;
     for (double y = -2.0; y <= 2.0; y += 0.02) {
-      const double dx = 2.0 - x(0);
-      const double dy = y - x(1);
-      scan.push_back({std::hypot(dx, dy), std::atan2(dy, dx) - x(2)});
+      scan.emplace_back(2.0, y);
     }
     std::vector<Eigen::Vector3d> ref;
     for (int k = 0; k <= 20; ++k) {
@@ -101,7 +98,9 @@ TEST(NmpcCbf, IgnoresPointsOutsideRangeAndFov)
   NmpcCbf mpc;
   mpc.compute(
     {0.0, 0.0, 0.0}, straight_ref(0.5, 0.1, 20),
-    {{5.0, 0.0}, {1.0, 0.75 * kPi}, {std::numeric_limits<double>::infinity(), 0.0}});
+    // 5 m ahead (out of range), 1 m at 135 deg (outside the fov), and a bad point.
+    {{5.0, 0.0}, {std::cos(0.75 * kPi), std::sin(0.75 * kPi)},
+     {std::numeric_limits<double>::infinity(), 0.0}});
   EXPECT_EQ(mpc.last_obstacle_count(), 0);
 }
 
@@ -110,7 +109,7 @@ TEST(NmpcCbf, ClosedLoopFollowsLPath)
   // Unicycle simulation following an L path with the forward-gated tracker.
   const double dt = 0.1;
   const auto path = maze_runner::densify({{0.0, 0.0}, {4.0, 0.0}, {4.0, 3.0}}, 0.1);
-  maze_runner::PathTracker tracker(path, 0.0, 200, 0.0);  // as the node uses it
+  maze_runner::PathTracker tracker(path);
   NmpcCbf mpc;
 
   Eigen::Vector3d x(0.0, 0.0, 0.0);
@@ -149,10 +148,11 @@ TEST(NmpcCbf, ClosedLoopFollowsLPath)
 namespace
 {
 
-// Lidar points on the visible side of a round pillar, in the robot frame.
-std::vector<ScanPoint> pillar_scan(const Eigen::Vector3d & x, const Eigen::Vector2d & c, double radius)
+// Lidar points on the visible side of a round pillar.
+std::vector<Eigen::Vector2d> pillar_scan(
+  const Eigen::Vector3d & x, const Eigen::Vector2d & c, double radius)
 {
-  std::vector<ScanPoint> scan;
+  std::vector<Eigen::Vector2d> scan;
   for (int i = 0; i < 360; ++i) {
     const double a = 2.0 * kPi * i / 360.0;
     const Eigen::Vector2d n(std::cos(a), std::sin(a));
@@ -161,8 +161,7 @@ std::vector<ScanPoint> pillar_scan(const Eigen::Vector3d & x, const Eigen::Vecto
     if (n.dot(rel) >= 0.0) {
       continue;  // back side, hidden
     }
-    const double bearing = std::atan2(rel.y(), rel.x()) - x(2);
-    scan.push_back({rel.norm(), std::atan2(std::sin(bearing), std::cos(bearing))});
+    scan.push_back(p);
   }
   return scan;
 }
@@ -187,7 +186,7 @@ PillarRun run_past_pillar(
   const Eigen::Vector2d pillar = origin + Eigen::Vector2d(3.0, pillar_y);
   const double pillar_radius = 0.15;
   const auto path = maze_runner::densify({origin, origin + Eigen::Vector2d(6.0, 0.0)}, 0.05);
-  maze_runner::PathTracker tracker(path, 0.0, 200, 0.0);
+  maze_runner::PathTracker tracker(path);
   NmpcCbf mpc(cfg);
 
   PillarRun run;
@@ -199,9 +198,7 @@ PillarRun run_past_pillar(
     auto scan = pillar_scan(x, pillar, pillar_radius);
     if (wall_y) {  // straight wall along x, as lidar points every 2 cm
       for (double wx = origin.x() - 2.0; wx < origin.x() + 8.0; wx += 0.02) {
-        const Eigen::Vector2d rel = Eigen::Vector2d(wx, origin.y() + *wall_y) - x.head<2>();
-        const double b = std::atan2(rel.y(), rel.x()) - x(2);
-        scan.push_back({rel.norm(), std::atan2(std::sin(b), std::cos(b))});
+        scan.emplace_back(wx, origin.y() + *wall_y);
       }
     }
     const auto u = mpc.compute(x, ref, scan);

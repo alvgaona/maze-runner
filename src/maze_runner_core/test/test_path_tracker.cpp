@@ -23,12 +23,11 @@ TEST(Densify, RejectsBadInput)
   EXPECT_THROW(densify({{0.0, 0.0}, {0.0, 0.0}}, 0.1), std::invalid_argument);
 }
 
-TEST(PathTracker, StartsAtClosestPointPlusLookahead)
+TEST(PathTracker, StartsAtClosestPoint)
 {
-  PathTracker tracker(densify({{0.0, 0.0}, {10.0, 0.0}}, 0.1), 0.1, 200, 0.45);
-  // Closest is x=3.0 (index 30); within 0.1 m it advances to 31; 5 steps of 0.1 m cover
-  // the 0.45 m lookahead -> 36.
-  EXPECT_EQ(tracker.update({3.0, 0.05}), 36u);
+  // No lead: the NMPC reference must start where the robot is, or it outruns reference_speed.
+  PathTracker tracker(densify({{0.0, 0.0}, {10.0, 0.0}}, 0.1));
+  EXPECT_EQ(tracker.update({3.0, 0.05}), 30u);
 }
 
 TEST(PathTracker, NeverMovesBackward)
@@ -43,7 +42,7 @@ TEST(PathTracker, WindowPreventsSkippingAhead)
 {
   // Out and back along the same line: from the start, the return leg is equally close,
   // but the window keeps the tracker on the outbound leg.
-  PathTracker tracker(densify({{0.0, 0.0}, {30.0, 0.0}, {0.0, 0.1}}, 0.1), 0.1, 50, 0.0);
+  PathTracker tracker(densify({{0.0, 0.0}, {30.0, 0.0}, {0.0, 0.1}}, 0.1), 50);
   tracker.update({0.0, 0.0});
   EXPECT_LT(tracker.update({0.5, 0.08}), 60u);
 }
