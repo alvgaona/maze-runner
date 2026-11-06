@@ -2,6 +2,7 @@
 // lidar scan. Localization matches them to map lines built from the world SDF walls;
 // with slam:=true it builds the line map itself, starting from the initial pose.
 
+#include <array>
 #include <cmath>
 #include <optional>
 #include <stdexcept>
@@ -103,6 +104,7 @@ public:
 
     tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
     pose_pub_ = create_publisher<geometry_msgs::msg::PoseWithCovarianceStamped>("ekf/pose", 10);
+    detections_pub_ = create_publisher<visualization_msgs::msg::Marker>("ekf/detections", 1);
     odom_sub_ = create_subscription<nav_msgs::msg::Odometry>(
       "diff_drive_controller/odom", 50,
       [this](nav_msgs::msg::Odometry::ConstSharedPtr msg) { on_odom(*msg); });
@@ -184,38 +186,47 @@ private:
     const auto lines = ransac_lines(std::move(points), ransac_);
     const int applied = ekf_ ? ekf_->update(lines) : slam_->update(lines);
     RCLCPP_DEBUG(get_logger(), "scan: %zu lines, %d applied", lines.size(), applied);
+    // Lines are in the base frame at the EKF state's time.
+    publish_segments(*detections_pub_, base_frame_, *last_odom_stamp_, {0.0f, 0.8f, 1.0f}, lines);
     if (slam_) {
-      publish_landmarks(msg.header.stamp);
+      std::vector<ObservedLine> mapped;
+      for (const auto & lm : slam_->landmarks()) {
+        mapped.push_back({lm.line.alpha, lm.line.d, 0.0, 0.0, lm.s_min, lm.s_max});
+      }
+      publish_segments(*landmarks_pub_, map_frame_, msg.header.stamp, {1.0f, 0.5f, 0.0f}, mapped);
     }
   }
 
   Eigen::Vector3d pose() const { return ekf_ ? ekf_->state() : slam_->pose(); }
   Eigen::Matrix3d pose_covariance() const { return ekf_ ? ekf_->covariance() : slam_->pose_covariance(); }
 
-  // Mapped walls as segments over the extent seen so far.
-  void publish_landmarks(const builtin_interfaces::msg::Time & stamp)
+  // Lines drawn over their extent [s_min, s_max], as one LINE_LIST.
+  static void publish_segments(
+    rclcpp::Publisher<visualization_msgs::msg::Marker> & pub, const std::string & frame,
+    const rclcpp::Time & stamp, const std::array<float, 3> & rgb, const std::vector<ObservedLine> & lines)
   {
     visualization_msgs::msg::Marker m;
     m.header.stamp = stamp;
-    m.header.frame_id = map_frame_;
+    m.header.frame_id = frame;
     m.ns = "lines";
     m.type = visualization_msgs::msg::Marker::LINE_LIST;
     m.pose.orientation.w = 1.0;
     m.scale.x = 0.05;
-    m.color.r = 1.0;
-    m.color.g = 0.5;
+    m.color.r = rgb[0];
+    m.color.g = rgb[1];
+    m.color.b = rgb[2];
     m.color.a = 1.0;
-    for (const auto & lm : slam_->landmarks()) {
-      const double c = std::cos(lm.line.alpha);
-      const double s = std::sin(lm.line.alpha);
-      for (const double t : {lm.s_min, lm.s_max}) {
+    for (const auto & l : lines) {
+      const double c = std::cos(l.alpha);
+      const double s = std::sin(l.alpha);
+      for (const double t : {l.s_min, l.s_max}) {
         geometry_msgs::msg::Point p;
-        p.x = lm.line.d * c - t * s;
-        p.y = lm.line.d * s + t * c;
+        p.x = l.d * c - t * s;
+        p.y = l.d * s + t * c;
         m.points.push_back(p);
       }
     }
-    landmarks_pub_->publish(m);
+    pub.publish(m);
   }
 
   void publish(const builtin_interfaces::msg::Time & stamp)
@@ -255,6 +266,7 @@ private:
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
   rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pose_pub_;
   rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr landmarks_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr detections_pub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
 };

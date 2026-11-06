@@ -54,6 +54,7 @@ target_link_libraries(planner_node
   rclcpp::rclcpp
   ${geometry_msgs_TARGETS}
   ${nav_msgs_TARGETS}
+  ${visualization_msgs_TARGETS}
   tf2_ros::tf2_ros
 )
 target_compile_options(planner_node PRIVATE -Wall -Wextra -Wpedantic)

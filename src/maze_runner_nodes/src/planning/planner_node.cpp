@@ -8,10 +8,12 @@
 #include <vector>
 
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <nav_msgs/msg/occupancy_grid.hpp>
 #include <nav_msgs/msg/path.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <tf2_ros/buffer.hpp>
 #include <tf2_ros/transform_listener.hpp>
+#include <visualization_msgs/msg/marker.hpp>
 
 #include "maze_runner_core/planning/astar.hpp"
 #include "maze_runner_core/planning/hybrid_astar.hpp"
@@ -67,6 +69,7 @@ public:
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(get_clock());
     tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
     path_pub_ = create_publisher<nav_msgs::msg::Path>("plan", rclcpp::QoS(1).transient_local());
+    publish_map(walls);
     goal_sub_ = create_subscription<geometry_msgs::msg::PoseStamped>(
       "goal_pose", 1, [this](geometry_msgs::msg::PoseStamped::ConstSharedPtr msg) {
         if (msg->header.frame_id != map_frame_) {
@@ -148,6 +151,50 @@ private:
     path_pub_->publish(msg);
   }
 
+  // For RViz, latched: the world walls and the inflated grid the planner searches.
+  void publish_map(const std::vector<maze_runner::Segment> & walls)
+  {
+    const auto latched = rclcpp::QoS(1).transient_local();
+    walls_pub_ = create_publisher<visualization_msgs::msg::Marker>("map_walls", latched);
+    grid_pub_ = create_publisher<nav_msgs::msg::OccupancyGrid>("planner/grid", latched);
+
+    visualization_msgs::msg::Marker m;
+    m.header.stamp = now();
+    m.header.frame_id = map_frame_;
+    m.ns = "walls";
+    m.type = visualization_msgs::msg::Marker::LINE_LIST;
+    m.pose.orientation.w = 1.0;
+    m.scale.x = 0.04;
+    m.color.r = m.color.g = m.color.b = 0.9f;
+    m.color.a = 1.0;
+    for (const auto & w : walls) {
+      for (const auto & e : {w.a, w.b}) {
+        geometry_msgs::msg::Point p;
+        p.x = e.x();
+        p.y = e.y();
+        m.points.push_back(p);
+      }
+    }
+    walls_pub_->publish(m);
+
+    nav_msgs::msg::OccupancyGrid g;
+    g.header = m.header;
+    g.info.resolution = static_cast<float>(grid_->resolution());
+    g.info.width = static_cast<unsigned>(grid_->width());
+    g.info.height = static_cast<unsigned>(grid_->height());
+    const Eigen::Vector2d origin = grid_->center({0, 0}) - Eigen::Vector2d::Constant(grid_->resolution() / 2);
+    g.info.origin.position.x = origin.x();
+    g.info.origin.position.y = origin.y();
+    g.info.origin.orientation.w = 1.0;
+    g.data.resize(static_cast<std::size_t>(g.info.width) * g.info.height);
+    for (int y = 0; y < grid_->height(); ++y) {
+      for (int x = 0; x < grid_->width(); ++x) {
+        g.data[grid_->index({x, y})] = grid_->free(Cell{x, y}) ? 0 : 100;
+      }
+    }
+    grid_pub_->publish(g);
+  }
+
   std::string planner_;
   HybridAStarConfig hybrid_;
   std::optional<OccupancyGrid> grid_;
@@ -157,6 +204,8 @@ private:
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr walls_pub_;
+  rclcpp::Publisher<nav_msgs::msg::OccupancyGrid>::SharedPtr grid_pub_;
   rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr goal_sub_;
   rclcpp::TimerBase::SharedPtr timer_;
 };
