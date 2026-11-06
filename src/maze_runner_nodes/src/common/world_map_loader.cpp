@@ -1,4 +1,4 @@
-#include "localization/world_map_loader.hpp"
+#include "common/world_map_loader.hpp"
 
 #include <cmath>
 #include <filesystem>
@@ -16,9 +16,9 @@
 #include <sdf/Root.hh>
 #include <sdf/World.hh>
 
-#include "maze_runner_core/localization/map_lines.hpp"
+#include <Eigen/Core>
 
-namespace maze_runner::localization
+namespace maze_runner
 {
 namespace
 {
@@ -36,8 +36,9 @@ Eigen::Vector3d compose(const Eigen::Vector3d & a, const gz::math::Pose3d & b)
 
 }  // namespace
 
-LoadedMap WorldMapLoader::load(const std::string & path, const std::string & model_name) const
+Walls WorldMapLoader::load(const std::string & model_name) const
 {
+  const std::string & path = world_file_;
   sdf::Root root;
   const auto errors = root.Load(path);
   const sdf::World * world = root.WorldByIndex(0);
@@ -50,8 +51,7 @@ LoadedMap WorldMapLoader::load(const std::string & path, const std::string & mod
     throw std::runtime_error("model '" + model_name + "' not found in " + path);
   }
 
-  std::vector<WallBox> boxes;
-  std::vector<Triangle> triangles;
+  Walls walls;
   const Eigen::Vector3d model_pose = compose(Eigen::Vector3d::Zero(), model->RawPose());
   for (uint64_t i = 0; i < model->LinkCount(); ++i) {
     const sdf::Link * link = model->LinkByIndex(i);
@@ -61,7 +61,7 @@ LoadedMap WorldMapLoader::load(const std::string & path, const std::string & mod
       const Eigen::Vector3d p = compose(link_pose, col->RawPose());
 
       if (const sdf::Box * box = col->Geom()->BoxShape()) {
-        boxes.push_back({p(0), p(1), p(2), box->Size().X(), box->Size().Y()});
+        walls.boxes.push_back({p(0), p(1), p(2), box->Size().X(), box->Size().Y()});
       } else if (const sdf::Mesh * mesh_sdf = col->Geom()->MeshShape()) {
         // Relative URIs are relative to the SDF file, as Gazebo resolves them.
         std::filesystem::path file = mesh_sdf->Uri();
@@ -83,18 +83,14 @@ LoadedMap WorldMapLoader::load(const std::string & path, const std::string & mod
               const auto q = sub->Vertex(sub->Index(k + v)) * scale;
               tri[v] = {p(0) + c * q.X() - s * q.Y(), p(1) + s * q.X() + c * q.Y(), q.Z()};
             }
-            triangles.push_back(tri);
+            walls.triangles.push_back(tri);
           }
         }
       }
     }
   }
 
-  LoadedMap out{wall_lines(boxes, min_face_length_), boxes.size(), triangles.size()};
-  for (const auto & l : mesh_lines(triangles, min_face_length_)) {
-    out.lines.push_back(l);
-  }
-  return out;
+  return walls;
 }
 
-}  // namespace maze_runner::localization
+}  // namespace maze_runner

@@ -7,7 +7,7 @@
 
 using maze_runner::localization::Line;
 using maze_runner::localization::wall_lines;
-using maze_runner::localization::WallBox;
+using maze_runner::WallBox;
 
 namespace
 {
@@ -95,11 +95,11 @@ namespace
 {
 
 // The 4 side faces of an axis-aligned box as triangles, plus its top.
-std::vector<maze_runner::localization::Triangle> box_mesh(double x0, double y0, double x1, double y1, double h)
+std::vector<maze_runner::Triangle> box_mesh(double x0, double y0, double x1, double y1, double h)
 {
   const Eigen::Vector3d a(x0, y0, 0), b(x1, y0, 0), c(x1, y1, 0), d(x0, y1, 0);
   const Eigen::Vector3d up(0, 0, h);
-  std::vector<maze_runner::localization::Triangle> tris;
+  std::vector<maze_runner::Triangle> tris;
   for (const auto & [p, q] : {std::pair{a, b}, {b, c}, {c, d}, {d, a}}) {
     tris.push_back({p, q, q + up});
     tris.push_back({p, q + up, p + up});

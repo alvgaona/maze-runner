@@ -18,7 +18,7 @@ find_package(gz_common_vendor REQUIRED)
 find_package(gz-common REQUIRED COMPONENTS graphics)
 find_package(maze_runner_core REQUIRED)
 
-add_library(world_map_loader STATIC src/localization/world_map_loader.cpp)
+add_library(world_map_loader STATIC src/common/world_map_loader.cpp)
 target_include_directories(world_map_loader PUBLIC src)
 target_link_libraries(world_map_loader PUBLIC maze_runner_core::maze_runner_core sdformat::sdformat gz-common::graphics)
 target_compile_options(world_map_loader PRIVATE -Wall -Wextra -Wpedantic)
@@ -48,11 +48,25 @@ target_link_libraries(nmpc_cbf_node
 target_include_directories(nmpc_cbf_node PRIVATE src)
 target_compile_options(nmpc_cbf_node PRIVATE -Wall -Wextra -Wpedantic)
 
-install(TARGETS ekf_lines_node nmpc_cbf_node DESTINATION lib/${PROJECT_NAME})
+add_executable(planner_node src/planning/planner_node.cpp)
+target_link_libraries(planner_node
+  world_map_loader
+  rclcpp::rclcpp
+  ${geometry_msgs_TARGETS}
+  ${nav_msgs_TARGETS}
+  tf2_ros::tf2_ros
+)
+target_compile_options(planner_node PRIVATE -Wall -Wextra -Wpedantic)
+
+add_executable(plan_benchmark src/planning/plan_benchmark.cpp)
+target_link_libraries(plan_benchmark world_map_loader)
+target_compile_options(plan_benchmark PRIVATE -Wall -Wextra -Wpedantic)
+
+install(TARGETS ekf_lines_node nmpc_cbf_node planner_node plan_benchmark DESTINATION lib/${PROJECT_NAME})
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
-  ament_add_gtest(test_world_map_loader test/localization/test_world_map_loader.cpp)
+  ament_add_gtest(test_world_map_loader test/common/test_world_map_loader.cpp)
   target_link_libraries(test_world_map_loader world_map_loader)
 endif()
 

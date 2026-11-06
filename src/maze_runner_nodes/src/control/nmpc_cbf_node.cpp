@@ -1,4 +1,4 @@
-// Path following with NMPC + lidar CBF: tracks a waypoint path using the localized pose
+// Path following with NMPC + lidar CBF: tracks the latest plan (topic `plan`) using the localized pose
 // (map -> base TF) and publishes velocity commands to the diff drive controller.
 
 #include <algorithm>
@@ -64,25 +64,13 @@ public:
     cfg.control_weights = {rw[0], rw[1]};
     cfg.control_rate_weights = {rdw[0], rdw[1]};
 
-    // Path: flat [x0, y0, x1, y1, ...] in the map frame, sampled at reference_speed * dt so
-    // consecutive reference points are one control step apart.
-    const auto flat = declare_parameter<std::vector<double>>("waypoints");
-    const double reference_speed = declare_parameter<double>("reference_speed", 0.5);
+    // Plans are resampled at reference_speed * dt so consecutive reference points are one
+    // control step apart.
+    reference_spacing_ = declare_parameter<double>("reference_speed", 0.5) * cfg.dt;
     goal_tolerance_ = declare_parameter<double>("goal_tolerance", 0.15);
     map_frame_ = declare_parameter<std::string>("map_frame", "map");
     base_frame_ = declare_parameter<std::string>("base_frame", "base_footprint");
-    if (flat.size() < 4 || flat.size() % 2 != 0) {
-      throw std::invalid_argument("waypoints must be [x0, y0, x1, y1, ...] with >= 2 points");
-    }
-    std::vector<Eigen::Vector2d> waypoints;
-    for (std::size_t i = 0; i < flat.size(); i += 2) {
-      waypoints.emplace_back(flat[i], flat[i + 1]);
-    }
-    tracker_.emplace(densify(waypoints, reference_speed * cfg.dt));
     mpc_.emplace(cfg);
-    RCLCPP_INFO(
-      get_logger(), "Tracking %zu waypoints (%zu reference points), horizon %d, dt %.2f s",
-      waypoints.size(), tracker_->path().size(), cfg.horizon, cfg.dt);
 
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(get_clock());
     tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
@@ -95,13 +83,40 @@ public:
     scan_sub_ = create_subscription<sensor_msgs::msg::LaserScan>(
       "scan", rclcpp::SensorDataQoS(),
       [this](sensor_msgs::msg::LaserScan::ConstSharedPtr msg) { on_scan(*msg); });
+    plan_sub_ = create_subscription<nav_msgs::msg::Path>(
+      "plan", rclcpp::QoS(1).transient_local(),
+      [this](nav_msgs::msg::Path::ConstSharedPtr msg) { on_plan(*msg); });
     timer_ = rclcpp::create_timer(
       this, get_clock(), std::chrono::duration<double>(cfg.dt), [this]() { on_timer(); });
-
-    publish_reference();
+    RCLCPP_INFO(get_logger(), "Horizon %d, dt %.2f s, waiting for a plan", cfg.horizon, cfg.dt);
   }
 
 private:
+  // A new plan replaces the current one, from wherever the robot is.
+  void on_plan(const nav_msgs::msg::Path & msg)
+  {
+    if (msg.header.frame_id != map_frame_) {
+      RCLCPP_WARN(get_logger(), "Ignoring plan in frame '%s', expected '%s'", msg.header.frame_id.c_str(), map_frame_.c_str());
+      return;
+    }
+    std::vector<Eigen::Vector2d> points;
+    for (const auto & p : msg.poses) {
+      points.emplace_back(p.pose.position.x, p.pose.position.y);
+    }
+    try {
+      tracker_.emplace(densify(points, reference_spacing_));
+    } catch (const std::invalid_argument & e) {
+      RCLCPP_WARN(get_logger(), "Ignoring plan: %s", e.what());
+      return;
+    }
+    mpc_->reset();
+    done_ = false;
+    RCLCPP_INFO(
+      get_logger(), "Tracking a plan of %zu poses (%zu reference points)", points.size(),
+      tracker_->path().size());
+    publish_reference();
+  }
+
   // Scan points in the map frame, using the pose at scan time: they stay put however much
   // the robot moves before the next solve.
   void on_scan(const sensor_msgs::msg::LaserScan & msg)
@@ -132,6 +147,9 @@ private:
 
   void on_timer()
   {
+    if (!tracker_) {
+      return;  // nothing to follow yet
+    }
     geometry_msgs::msg::TransformStamped t;
     try {
       t = tf_buffer_->lookupTransform(map_frame_, base_frame_, tf2::TimePointZero);
@@ -225,6 +243,7 @@ private:
   std::optional<NmpcCbf> mpc_;
   std::vector<Eigen::Vector2d> scan_;  // map frame
   std::optional<rclcpp::Time> scan_stamp_;
+  double reference_spacing_;
   double goal_tolerance_;
   std::string map_frame_;
   std::string base_frame_;
@@ -239,6 +258,7 @@ private:
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr solve_time_pub_;
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
+  rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr plan_sub_;
   rclcpp::TimerBase::SharedPtr timer_;
 };
 

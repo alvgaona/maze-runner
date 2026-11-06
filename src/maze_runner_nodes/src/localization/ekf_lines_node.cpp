@@ -19,10 +19,11 @@
 
 #include "maze_runner_core/localization/ekf_lines.hpp"
 #include "maze_runner_core/localization/ekf_lines_slam.hpp"
+#include "maze_runner_core/localization/map_lines.hpp"
 #include "maze_runner_core/localization/odometry.hpp"
 #include "maze_runner_core/localization/ransac_lines.hpp"
+#include "common/world_map_loader.hpp"
 #include "common/yaw.hpp"
-#include "localization/world_map_loader.hpp"
 
 namespace
 {
@@ -83,14 +84,18 @@ public:
     } else {
       const auto world_file = declare_parameter<std::string>("world_file");
       const auto wall_model = declare_parameter<std::string>("wall_model", "maze");
-      auto map = WorldMapLoader(min_face).load(world_file, wall_model);
+      const auto walls = maze_runner::WorldMapLoader(world_file).load(wall_model);
+      auto lines = wall_lines(walls.boxes, min_face);
+      for (const auto & l : mesh_lines(walls.triangles, min_face)) {
+        lines.push_back(l);
+      }
       RCLCPP_INFO(
         get_logger(), "Map from %s: %zu boxes, %zu mesh triangles -> %zu lines", world_file.c_str(),
-        map.boxes, map.triangles, map.lines.size());
+        walls.boxes.size(), walls.triangles.size(), lines.size());
 
       ekf_.emplace(
         pose0, Eigen::Vector3d(s0[0] * s0[0], s0[1] * s0[1], s0[2] * s0[2]).asDiagonal().toDenseMatrix(),
-        std::move(map.lines), filter);
+        std::move(lines), filter);
     }
 
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(get_clock());
