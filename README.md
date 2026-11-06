@@ -180,4 +180,4 @@ The code is under the MIT License. See [LICENSE](LICENSE).
 
 The robot and lidar meshes in `maze_runner_description/meshes` come from Husarion and are
 under the Apache License 2.0. See
-[LICENSE.husarion](src/maze_runner_description/meshes/LICENSE.husarion).
+[LICENSE.husarion](maze_runner_description/meshes/LICENSE.husarion).
