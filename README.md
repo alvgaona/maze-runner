@@ -4,6 +4,7 @@ A Husarion ROSbot XL drives itself through a maze in simulation.
 
 - **Robot:** mecanum wheels driven as a differential robot, with an RPLIDAR S3.
 - **Localization:** an EKF that matches lines seen by the lidar to the walls of the map.
+  With `slam:=true` it builds that map of lines itself instead (EKF SLAM).
 - **Control:** an NMPC controller follows the route. A control barrier function, or CBF,
   keeps it clear of walls and obstacles.
 - **Stack:** ROS 2 Lyrical, Gazebo Jetty, all C++.
@@ -68,6 +69,7 @@ gz sim -g --render-engine-gui-api-backend opengl
 | `gui` | `true` | Start the Gazebo GUI. |
 | `rviz` | `true` | Start RViz. |
 | `localization` | `true` | Start the EKF node. |
+| `slam` | `false` | Build the line map online (EKF SLAM) instead of loading it from `world`. The map frame starts at the robot's start pose. |
 | `controller` | `false` | Start the NMPC node and drive right away. |
 | `path` | `config/maze_path.yaml` | Route to follow. |
 | `x`, `y`, `yaw` | maze start | Robot start pose. |
@@ -99,7 +101,7 @@ ros2 bag reindex bags/my_run -s mcap
 | Package | What it holds |
 |---|---|
 | `maze_runner_core` | The algorithms, with no ROS, and their unit tests. |
-| `maze_runner_nodes` | The ROS nodes. `ekf_lines_node` publishes `ekf/pose` and `map -> odom`. `nmpc_cbf_node` publishes `diff_drive_controller/cmd_vel`. |
+| `maze_runner_nodes` | The ROS nodes. `ekf_lines_node` publishes `ekf/pose` and `map -> odom`, plus the mapped walls on `ekf/landmarks` in SLAM mode. `nmpc_cbf_node` publishes `diff_drive_controller/cmd_vel`. |
 | `maze_runner_description` | Robot URDF, ros2_control config and Husarion meshes under Apache-2.0. |
 | `maze_runner_gazebo` | Worlds, route, Gazebo bridge, RViz config and `sim.launch.xml`. |
 
@@ -110,7 +112,7 @@ Both C++ packages are split into the same modules. Each module has its own names
 
 | Module | Namespace | In `maze_runner_core` | In `maze_runner_nodes` |
 |---|---|---|---|
-| `localization` | `maze_runner::localization` | Line EKF, RANSAC line extraction, map lines from walls and meshes, odometry deltas | `ekf_lines_node`, and `WorldMapLoader` to read the walls from a world SDF |
+| `localization` | `maze_runner::localization` | Line EKF, line EKF SLAM, RANSAC line extraction, map lines from walls and meshes, odometry deltas | `ekf_lines_node`, and `WorldMapLoader` to read the walls from a world SDF |
 | `control` | `maze_runner::control` | NMPC-CBF with CasADi and IPOPT, path tracker | `nmpc_cbf_node` |
 | shared | `maze_runner` | `angles.hpp` | `common/yaw.hpp` |
 

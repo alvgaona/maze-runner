@@ -122,3 +122,15 @@ TEST(RansacLines, SameInputSameLines)
     EXPECT_EQ(a[i].d, b[i].d);
   }
 }
+
+TEST(RansacLines, ReportsSegmentExtent)
+{
+  std::vector<Eigen::Vector2d> pts;
+  add_segment(pts, {2.0, -0.5}, {2.0, 1.5}, 0.05);  // alpha 0: tangent is +y
+
+  const auto lines = ransac_lines(pts, RansacConfig{.distance_threshold = 0.015, .min_points = 3, .seed = 42});
+
+  ASSERT_EQ(lines.size(), 1u);
+  EXPECT_NEAR(lines[0].s_min, -0.5, 1e-9);
+  EXPECT_NEAR(lines[0].s_max, 1.5, 1e-9);
+}

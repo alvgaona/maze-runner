@@ -1,5 +1,6 @@
-// Line-based EKF localization: predicts from wheel odometry, corrects with lines
-// extracted from the lidar scan, against map lines built from the world SDF walls.
+// Line-based EKF: predicts from wheel odometry, corrects with lines extracted from the
+// lidar scan. Localization matches them to map lines built from the world SDF walls;
+// with slam:=true it builds the line map itself, starting from the initial pose.
 
 #include <cmath>
 #include <optional>
@@ -14,8 +15,10 @@
 #include <tf2_ros/buffer.hpp>
 #include <tf2_ros/transform_broadcaster.hpp>
 #include <tf2_ros/transform_listener.hpp>
+#include <visualization_msgs/msg/marker.hpp>
 
 #include "maze_runner_core/localization/ekf_lines.hpp"
+#include "maze_runner_core/localization/ekf_lines_slam.hpp"
 #include "maze_runner_core/localization/odometry.hpp"
 #include "maze_runner_core/localization/ransac_lines.hpp"
 #include "common/yaw.hpp"
@@ -33,8 +36,7 @@ public:
   EkfLinesNode()
   : Node("ekf_lines")
   {
-    const auto world_file = declare_parameter<std::string>("world_file");
-    const auto wall_model = declare_parameter<std::string>("wall_model", "maze");
+    const bool slam = declare_parameter<bool>("slam", false);
     const auto x0 = declare_parameter<std::vector<double>>("initial_pose", {0.0, 0.0, 0.0});
     const auto s0 = declare_parameter<std::vector<double>>("initial_sigma", {0.1, 0.1, 0.01});
     const auto sq = declare_parameter<std::vector<double>>("odom_sigma", {0.002, 0.002});
@@ -57,20 +59,39 @@ public:
       throw std::invalid_argument("ransac_min_points must be >= 2 (a line needs two points)");
     }
 
-    auto map = WorldMapLoader(min_face).load(world_file, wall_model);
-    RCLCPP_INFO(
-      get_logger(), "Map from %s: %zu boxes, %zu mesh triangles -> %zu lines", world_file.c_str(),
-      map.boxes, map.triangles, map.lines.size());
+    const Eigen::Vector3d pose0(x0[0], x0[1], x0[2]);
+    const EkfLinesConfig filter{
+      .process_noise = Eigen::Vector2d(sq[0] * sq[0], sq[1] * sq[1]).asDiagonal(),
+      .chi2_threshold = chi2,
+      .lateral_variance = lateral_sigma * lateral_sigma,
+      .heading_variance = heading_sigma * heading_sigma};
 
-    ekf_.emplace(
-      Eigen::Vector3d(x0[0], x0[1], x0[2]),
-      Eigen::Vector3d(s0[0] * s0[0], s0[1] * s0[1], s0[2] * s0[2]).asDiagonal().toDenseMatrix(),
-      std::move(map.lines),
-      EkfLinesConfig{
-        .process_noise = Eigen::Vector2d(sq[0] * sq[0], sq[1] * sq[1]).asDiagonal(),
-        .chi2_threshold = chi2,
-        .lateral_variance = lateral_sigma * lateral_sigma,
-        .heading_variance = heading_sigma * heading_sigma});
+    if (slam) {
+      EkfLinesSlamConfig cfg{
+        .filter = filter,
+        .new_line_chi2 = declare_parameter<double>("new_line_chi2", 50.0),
+        .overlap_margin = declare_parameter<double>("overlap_margin", 0.5),
+        .min_observations = static_cast<int>(declare_parameter<int>("min_observations", 3)),
+        .candidate_timeout = static_cast<int>(declare_parameter<int>("candidate_timeout", 10))};
+      if (cfg.min_observations < 1 || cfg.new_line_chi2 < chi2) {
+        throw std::invalid_argument("min_observations must be >= 1 and new_line_chi2 >= chi2_threshold");
+      }
+      // The map frame is the start pose, so it's exact; initial_sigma doesn't apply.
+      slam_.emplace(pose0, Eigen::Matrix3d::Zero(), cfg);
+      landmarks_pub_ = create_publisher<visualization_msgs::msg::Marker>("ekf/landmarks", 1);
+      RCLCPP_INFO(get_logger(), "SLAM mode: building the line map from (%.2f, %.2f, %.2f)", x0[0], x0[1], x0[2]);
+    } else {
+      const auto world_file = declare_parameter<std::string>("world_file");
+      const auto wall_model = declare_parameter<std::string>("wall_model", "maze");
+      auto map = WorldMapLoader(min_face).load(world_file, wall_model);
+      RCLCPP_INFO(
+        get_logger(), "Map from %s: %zu boxes, %zu mesh triangles -> %zu lines", world_file.c_str(),
+        map.boxes, map.triangles, map.lines.size());
+
+      ekf_.emplace(
+        pose0, Eigen::Vector3d(s0[0] * s0[0], s0[1] * s0[1], s0[2] * s0[2]).asDiagonal().toDenseMatrix(),
+        std::move(map.lines), filter);
+    }
 
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(get_clock());
     tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
@@ -92,7 +113,11 @@ private:
     const Eigen::Vector3d odom(p.position.x, p.position.y, yaw_of(p.orientation));
     if (last_odom_) {
       const auto delta = odometry_delta(*last_odom_, odom);
-      ekf_->predict(delta.d, delta.theta);
+      if (ekf_) {
+        ekf_->predict(delta.d, delta.theta);
+      } else {
+        slam_->predict(delta.d, delta.theta);
+      }
     }
     last_odom_ = odom;
     last_odom_stamp_ = msg.header.stamp;
@@ -104,7 +129,7 @@ private:
   // map->odom such that map->odom->base equals the EKF pose (REP 105).
   void publish_map_to_odom(const nav_msgs::msg::Odometry & msg, const Eigen::Vector3d & odom)
   {
-    const auto & x = ekf_->state();
+    const Eigen::Vector3d x = pose();
     const double yaw = x(2) - odom(2);
     const double c = std::cos(yaw);
     const double s = std::sin(yaw);
@@ -152,14 +177,46 @@ private:
     }
 
     const auto lines = ransac_lines(std::move(points), ransac_);
-    const int applied = ekf_->update(lines);
+    const int applied = ekf_ ? ekf_->update(lines) : slam_->update(lines);
     RCLCPP_DEBUG(get_logger(), "scan: %zu lines, %d applied", lines.size(), applied);
+    if (slam_) {
+      publish_landmarks(msg.header.stamp);
+    }
+  }
+
+  Eigen::Vector3d pose() const { return ekf_ ? ekf_->state() : slam_->pose(); }
+  Eigen::Matrix3d pose_covariance() const { return ekf_ ? ekf_->covariance() : slam_->pose_covariance(); }
+
+  // Mapped walls as segments over the extent seen so far.
+  void publish_landmarks(const builtin_interfaces::msg::Time & stamp)
+  {
+    visualization_msgs::msg::Marker m;
+    m.header.stamp = stamp;
+    m.header.frame_id = map_frame_;
+    m.ns = "lines";
+    m.type = visualization_msgs::msg::Marker::LINE_LIST;
+    m.pose.orientation.w = 1.0;
+    m.scale.x = 0.05;
+    m.color.r = 1.0;
+    m.color.g = 0.5;
+    m.color.a = 1.0;
+    for (const auto & lm : slam_->landmarks()) {
+      const double c = std::cos(lm.line.alpha);
+      const double s = std::sin(lm.line.alpha);
+      for (const double t : {lm.s_min, lm.s_max}) {
+        geometry_msgs::msg::Point p;
+        p.x = lm.line.d * c - t * s;
+        p.y = lm.line.d * s + t * c;
+        m.points.push_back(p);
+      }
+    }
+    landmarks_pub_->publish(m);
   }
 
   void publish(const builtin_interfaces::msg::Time & stamp)
   {
-    const auto & x = ekf_->state();
-    const auto & P = ekf_->covariance();
+    const Eigen::Vector3d x = pose();
+    const Eigen::Matrix3d P = pose_covariance();
 
     geometry_msgs::msg::PoseWithCovarianceStamped out;
     out.header.stamp = stamp;
@@ -178,7 +235,9 @@ private:
     pose_pub_->publish(out);
   }
 
+  // Exactly one is set: localization against a known map, or SLAM.
   std::optional<EkfLines> ekf_;
+  std::optional<EkfLinesSlam> slam_;
   std::optional<Eigen::Vector3d> last_odom_;
   std::optional<rclcpp::Time> last_odom_stamp_;
   std::string odom_frame_;
@@ -190,6 +249,7 @@ private:
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
   rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr pose_pub_;
+  rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr landmarks_pub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
 };

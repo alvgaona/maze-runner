@@ -10,6 +10,7 @@ find_package(casadi REQUIRED)
 
 add_library(${PROJECT_NAME}
   src/localization/ekf_lines.cpp
+  src/localization/ekf_lines_slam.cpp
   src/localization/ransac_lines.cpp
   src/localization/map_lines.cpp
   src/localization/odometry.cpp
@@ -37,6 +38,8 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
   ament_add_gtest(test_ekf_lines test/localization/test_ekf_lines.cpp)
   target_link_libraries(test_ekf_lines ${PROJECT_NAME})
+  ament_add_gtest(test_ekf_lines_slam test/localization/test_ekf_lines_slam.cpp)
+  target_link_libraries(test_ekf_lines_slam ${PROJECT_NAME})
   ament_add_gtest(test_ransac_lines test/localization/test_ransac_lines.cpp)
   target_link_libraries(test_ransac_lines ${PROJECT_NAME})
   ament_add_gtest(test_map_lines test/localization/test_map_lines.cpp)

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <numbers>
 #include <random>
 
@@ -58,6 +59,14 @@ ObservedLine fit_line(const std::vector<Eigen::Vector2d> & pts)
   if (line.d < 0.0) {
     line.d = -line.d;
     line.alpha = std::atan2(-n.y(), -n.x());
+  }
+
+  const Eigen::Vector2d tc(-std::sin(line.alpha), std::cos(line.alpha));
+  line.s_min = std::numeric_limits<double>::infinity();
+  line.s_max = -std::numeric_limits<double>::infinity();
+  for (const auto & p : pts) {
+    line.s_min = std::min(line.s_min, tc.dot(p));
+    line.s_max = std::max(line.s_max, tc.dot(p));
   }
   return line;
 }

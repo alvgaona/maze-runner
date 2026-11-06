@@ -23,6 +23,16 @@ struct EkfLinesConfig
   double heading_variance = 0.0;
 };
 
+// One step of the midpoint odometry model on the pose [x, y, theta].
+struct MotionStep
+{
+  Eigen::Matrix3d A;  // Jacobian wrt the pose
+  Eigen::Matrix3d Q;  // noise added: P' = A P A^T + Q
+};
+
+// Moves `pose` in place by the odometry increments and returns the step's linearization.
+MotionStep move_pose(Eigen::Vector3d & pose, double delta_d, double delta_theta, const EkfLinesConfig & config);
+
 // EKF localization against a known map of lines. State is [x, y, theta].
 class EkfLines
 {

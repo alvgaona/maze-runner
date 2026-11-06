@@ -19,6 +19,10 @@ struct ObservedLine
   double d;
   double sigma_alpha;
   double sigma_d;
+  // Extent of the seen segment along the tangent t = (-sin alpha, cos alpha), robot frame:
+  // its endpoints are d * n + s * t for s in [s_min, s_max].
+  double s_min = 0.0;
+  double s_max = 0.0;
 };
 
 }  // namespace maze_runner::localization

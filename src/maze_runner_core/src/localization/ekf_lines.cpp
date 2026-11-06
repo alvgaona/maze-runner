@@ -26,31 +26,38 @@ EkfLines::EkfLines(
 {
 }
 
-void EkfLines::predict(double delta_d, double delta_theta)
+MotionStep move_pose(Eigen::Vector3d & x, double delta_d, double delta_theta, const EkfLinesConfig & cfg)
 {
-  const double theta_mid = x_(2) + delta_theta / 2.0;
+  const double theta_mid = x(2) + delta_theta / 2.0;
   const double c = std::cos(theta_mid);
   const double s = std::sin(theta_mid);
 
-  x_(0) += delta_d * c;
-  x_(1) += delta_d * s;
-  x_(2) = wrap_angle(x_(2) + delta_theta);
+  x(0) += delta_d * c;
+  x(1) += delta_d * s;
+  x(2) = wrap_angle(x(2) + delta_theta);
 
-  Eigen::Matrix3d A;
-  A << 1, 0, -delta_d * s,
-       0, 1, delta_d * c,
-       0, 0, 1;
+  MotionStep step;
+  step.A << 1, 0, -delta_d * s,
+            0, 1, delta_d * c,
+            0, 0, 1;
 
   Eigen::Matrix<double, 3, 2> W;
   W << c, -0.5 * delta_d * s,
        s, 0.5 * delta_d * c,
        0, 1;
 
-  P_ = A * P_ * A.transpose() + W * cfg_.process_noise * W.transpose();
+  step.Q = W * cfg.process_noise * W.transpose();
 
   const Eigen::Vector2d lateral(-s, c);
-  P_.topLeftCorner<2, 2>() += cfg_.lateral_variance * std::abs(delta_d) * lateral * lateral.transpose();
-  P_(2, 2) += cfg_.heading_variance * (std::abs(delta_d) + std::abs(delta_theta));
+  step.Q.topLeftCorner<2, 2>() += cfg.lateral_variance * std::abs(delta_d) * lateral * lateral.transpose();
+  step.Q(2, 2) += cfg.heading_variance * (std::abs(delta_d) + std::abs(delta_theta));
+  return step;
+}
+
+void EkfLines::predict(double delta_d, double delta_theta)
+{
+  const auto step = move_pose(x_, delta_d, delta_theta, cfg_);
+  P_ = step.A * P_ * step.A.transpose() + step.Q;
 }
 
 int EkfLines::update(const std::vector<ObservedLine> & observed)

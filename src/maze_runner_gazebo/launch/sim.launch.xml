@@ -3,6 +3,8 @@
   <arg name="gui" default="true"/>
   <arg name="rviz" default="true"/>
   <arg name="localization" default="true"/>
+  <!-- Build the line map online (EKF SLAM) instead of loading it from the world -->
+  <arg name="slam" default="false"/>
   <!-- Path following needs localization (map -> odom) -->
   <arg name="controller" default="false"/>
   <arg name="path" default="$(find-pkg-share maze_runner_gazebo)/config/maze_path.yaml"/>
@@ -41,6 +43,7 @@
 
   <node pkg="maze_runner_nodes" exec="ekf_lines_node" output="screen" if="$(var localization)">
     <param name="world_file" value="$(var world)"/>
+    <param name="slam" value="$(var slam)"/>
     <param name="initial_pose" value="[$(var x), $(var y), $(var yaw)]"/>
     <param name="use_sim_time" value="true"/>
   </node>
@@ -58,7 +61,7 @@
   <executable if="$(eval '\'$(var bag)\' != \'\'')" output="screen"
               cmd="ros2 bag record -s mcap -o $(var bag) --use-sim-time --topics
                    /clock /tf /tf_static /scan /joint_states
-                   /ground_truth/odom /ekf/pose /diff_drive_controller/odom
+                   /ground_truth/odom /ekf/pose /ekf/landmarks /diff_drive_controller/odom
                    /diff_drive_controller/cmd_vel /diff_drive_controller/cmd_vel_out
                    /nmpc/reference /nmpc/solve_time_ms"/>
 </launch>

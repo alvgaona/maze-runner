@@ -35,6 +35,11 @@ Visualization Manager:
       Enabled: true
       Topic:
         Value: /ekf/pose
+    - Class: rviz_default_plugins/Marker
+      Name: SLAM map
+      Enabled: true
+      Topic:
+        Value: /ekf/landmarks
     - Class: rviz_default_plugins/Path
       Name: Reference
       Enabled: true
