@@ -21,7 +21,7 @@ c-compiler = "*"
 cxx-compiler = "*"
 
 [activation.env]
-# With OpenMP threads IPOPT takes 15 ms per solve.
+# OpenMP threads make IPOPT ~8x slower on these small solves (120 ms vs 15 ms).
 OMP_NUM_THREADS = "1"
 
 [tasks]
