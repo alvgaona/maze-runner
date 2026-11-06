@@ -10,17 +10,20 @@ controller_manager:
 
 diff_drive_controller:
   ros__parameters:
-    left_wheel_names: ["left_wheel_joint"]
-    right_wheel_names: ["right_wheel_joint"]
-    # Keep in sync with urdf/maze_runner.urdf.xacro
-    wheel_separation: 0.34
-    wheel_radius: 0.08
+    left_wheel_names: ["fl_wheel_joint", "rl_wheel_joint"]
+    right_wheel_names: ["fr_wheel_joint", "rr_wheel_joint"]
+    # Mecanum (X layout) driven left/right turns like a diff drive with
+    # separation 2 * (lx + ly) = 2 * (0.085 + 0.135). Keep in sync with the URDF.
+    wheel_separation: 0.44
+    wheel_radius: 0.05
 
     odom_frame_id: odom
     base_frame_id: base_footprint
     enable_odom_tf: true
     publish_rate: 50.0
     cmd_vel_timeout: 0.5
+    # Echo the rate-limited command on ~/cmd_vel_out, for evaluation
+    publish_limited_velocity: true
 
     # Ramp forward speed so the wheels don't slip on takeoff; slip corrupts odometry heading.
     # No turn-rate limit: the NMPC model assumes instant turn rate, and lag makes it oscillate.

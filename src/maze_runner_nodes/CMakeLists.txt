@@ -10,6 +10,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(sdformat_vendor REQUIRED)
 find_package(sdformat REQUIRED)
 find_package(gz_common_vendor REQUIRED)
@@ -36,6 +37,7 @@ target_link_libraries(nmpc_cbf_node
   ${geometry_msgs_TARGETS}
   ${nav_msgs_TARGETS}
   ${sensor_msgs_TARGETS}
+  ${std_msgs_TARGETS}
   tf2_ros::tf2_ros
 )
 target_compile_options(nmpc_cbf_node PRIVATE -Wall -Wextra -Wpedantic)

@@ -1,164 +1,166 @@
 <?xml version="1.0"?>
 <robot name="maze_runner" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <!-- Keep wheel_radius / wheel_separation in sync with config/controllers.yaml -->
-  <xacro:property name="wheel_radius" value="0.08"/>
-  <xacro:property name="wheel_separation" value="0.34"/>
-  <xacro:property name="wheel_width" value="0.04"/>
-  <xacro:property name="base_x" value="0.40"/>
-  <xacro:property name="base_y" value="0.28"/>
-  <xacro:property name="base_z" value="0.12"/>
-  <xacro:property name="base_mass" value="8.0"/>
-  <xacro:property name="wheel_mass" value="0.5"/>
-  <xacro:property name="caster_radius" value="0.04"/>
+  <!-- Husarion ROSbot XL with mecanum wheels and the Autonomy kit lidar (RPLIDAR S3).
+       Geometry, masses, meshes and wheel friction from husarion/rosbot_ros and
+       husarion/husarion_components_description (Apache-2.0, see meshes/LICENSE.husarion).
+       Driven as a differential robot, left pair vs right pair. -->
 
-  <xacro:macro name="box_inertia" params="m x y z">
-    <inertia ixx="${m*(y*y+z*z)/12}" ixy="0" ixz="0"
-             iyy="${m*(x*x+z*z)/12}" iyz="0" izz="${m*(x*x+y*y)/12}"/>
-  </xacro:macro>
+  <!-- Keep wheel_radius in sync with config/controllers.yaml -->
+  <xacro:property name="wheel_radius" value="0.05"/>
+  <xacro:property name="wheel_separation_x" value="0.170"/>
+  <xacro:property name="wheel_separation_y" value="0.270"/>
+  <xacro:property name="wheel_thickness" value="0.05"/>
+  <xacro:property name="mesh_dir" value="file://$(find maze_runner_description)/meshes"/>
 
   <link name="base_footprint"/>
 
+  <!-- base_link is Husarion's body_link, at wheel axle height -->
   <link name="base_link">
     <visual>
-      <geometry><box size="${base_x} ${base_y} ${base_z}"/></geometry>
-      <material name="red"><color rgba="0.8 0.1 0.1 1"/></material>
+      <geometry><mesh filename="${mesh_dir}/rosbot_xl_body.dae"/></geometry>
     </visual>
     <collision>
-      <geometry><box size="${base_x} ${base_y} ${base_z}"/></geometry>
+      <geometry><mesh filename="${mesh_dir}/rosbot_xl_body_collision.stl"/></geometry>
     </collision>
     <inertial>
-      <mass value="${base_mass}"/>
-      <xacro:box_inertia m="${base_mass}" x="${base_x}" y="${base_y}" z="${base_z}"/>
+      <origin xyz="0 0 0.0358"/>
+      <mass value="3.5"/>
+      <inertia ixx="0.01393" ixy="-0.000020968097" ixz="0.000010399694"
+               iyy="0.01081" iyz="0.000059372953" izz="0.02048"/>
     </inertial>
   </link>
-
-  <!-- Wheel axle sits at wheel_radius above ground; base center sits at the axle height -->
   <joint name="base_joint" type="fixed">
     <parent link="base_footprint"/>
     <child link="base_link"/>
     <origin xyz="0 0 ${wheel_radius}"/>
   </joint>
 
-  <xacro:macro name="wheel" params="side y">
-    <link name="${side}_wheel_link">
-      <visual>
-        <origin rpy="${pi/2} 0 0"/>
-        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
-        <material name="black"><color rgba="0.1 0.1 0.1 1"/></material>
-      </visual>
-      <collision>
-        <origin rpy="${pi/2} 0 0"/>
-        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
-      </collision>
-      <inertial>
-        <mass value="${wheel_mass}"/>
-        <inertia ixx="${wheel_mass*(3*wheel_radius*wheel_radius+wheel_width*wheel_width)/12}" ixy="0" ixz="0"
-                 iyy="${wheel_mass*wheel_radius*wheel_radius/2}" iyz="0"
-                 izz="${wheel_mass*(3*wheel_radius*wheel_radius+wheel_width*wheel_width)/12}"/>
-      </inertial>
-    </link>
+  <!-- fdir is the roller direction in base_link; mecanum is faked with anisotropic friction -->
+  <xacro:macro name="wheel" params="side x y mesh yaw fdir">
     <joint name="${side}_wheel_joint" type="continuous">
       <parent link="base_link"/>
       <child link="${side}_wheel_link"/>
-      <origin xyz="0 ${y} 0"/>
+      <origin xyz="${x} ${y} 0"/>
       <axis xyz="0 1 0"/>
+      <limit effort="1.5" velocity="30.0"/>
+      <dynamics damping="0.001" friction="0.001"/>
     </joint>
-    <gazebo reference="${side}_wheel_link">
-      <mu1>1.0</mu1>
-      <mu2>1.0</mu2>
-    </gazebo>
-  </xacro:macro>
-
-  <xacro:wheel side="left" y="${wheel_separation/2}"/>
-  <xacro:wheel side="right" y="${-wheel_separation/2}"/>
-
-  <!-- Frictionless casters front and back -->
-  <xacro:macro name="caster" params="name x">
-    <link name="${name}_caster_link">
-      <collision><geometry><sphere radius="${caster_radius}"/></geometry></collision>
-      <visual><geometry><sphere radius="${caster_radius}"/></geometry></visual>
+    <link name="${side}_wheel_link">
+      <visual>
+        <origin rpy="0 0 ${yaw}"/>
+        <geometry><mesh filename="${mesh_dir}/rosbot_xl_mecanum_${mesh}.dae"/></geometry>
+      </visual>
+      <collision>
+        <origin rpy="${pi/2} 0 0"/>
+        <geometry><cylinder radius="${wheel_radius}" length="${wheel_thickness}"/></geometry>
+      </collision>
       <inertial>
-        <mass value="0.1"/>
-        <inertia ixx="1e-4" ixy="0" ixz="0" iyy="1e-4" iyz="0" izz="1e-4"/>
+        <mass value="0.4"/>
+        <inertia ixx="0.0003145" ixy="0" ixz="0" iyy="0.0004561" iyz="0" izz="0.0003145"/>
       </inertial>
     </link>
-    <joint name="${name}_caster_joint" type="fixed">
-      <parent link="base_link"/>
-      <child link="${name}_caster_link"/>
-      <origin xyz="${x} 0 ${caster_radius - wheel_radius}"/>
-    </joint>
-    <gazebo reference="${name}_caster_link">
-      <mu1>0.0</mu1>
-      <mu2>0.0</mu2>
+    <gazebo reference="${side}_wheel_link" xmlns:gz="http://gazeborobotics.org/schema">
+      <collision>
+        <surface>
+          <friction>
+            <ode>
+              <mu>0.8</mu>
+              <mu2>0.2</mu2>
+              <slip1>0.035</slip1>
+              <slip2>0</slip2>
+              <fdir1 gz:expressed_in="base_link">${fdir}</fdir1>
+            </ode>
+          </friction>
+        </surface>
+      </collision>
     </gazebo>
   </xacro:macro>
 
-  <xacro:caster name="front" x="${base_x/2 - caster_radius}"/>
-  <xacro:caster name="rear" x="${-base_x/2 + caster_radius}"/>
+  <xacro:wheel side="fl" x="${wheel_separation_x/2}" y="${wheel_separation_y/2}" mesh="b" yaw="${pi}" fdir="1 -1 0"/>
+  <xacro:wheel side="fr" x="${wheel_separation_x/2}" y="${-wheel_separation_y/2}" mesh="a" yaw="${pi}" fdir="1 1 0"/>
+  <xacro:wheel side="rl" x="${-wheel_separation_x/2}" y="${wheel_separation_y/2}" mesh="a" yaw="0" fdir="1 1 0"/>
+  <xacro:wheel side="rr" x="${-wheel_separation_x/2}" y="${-wheel_separation_y/2}" mesh="b" yaw="0" fdir="1 -1 0"/>
 
-  <!-- 2D lidar -->
+  <!-- RPLIDAR S3 on the top cover, as in the Autonomy kit. lidar_link is the bottom of the sensor. -->
   <link name="lidar_link">
     <visual>
-      <geometry><cylinder radius="0.04" length="0.05"/></geometry>
-      <material name="green"><color rgba="0.1 0.8 0.1 1"/></material>
+      <!-- glTF is Y-up -->
+      <origin rpy="${pi/2} 0 0"/>
+      <geometry><mesh filename="${mesh_dir}/rplidar_s3.glb"/></geometry>
     </visual>
-    <collision><geometry><cylinder radius="0.04" length="0.05"/></geometry></collision>
+    <collision>
+      <origin xyz="0 0 ${0.0413/2}"/>
+      <geometry><box size="0.0556 0.0556 0.0413"/></geometry>
+    </collision>
     <inertial>
-      <mass value="0.2"/>
-      <inertia ixx="1e-4" ixy="0" ixz="0" iyy="1e-4" iyz="0" izz="1e-4"/>
+      <origin xyz="0 0 ${0.0413/2 + 0.0018237}"/>
+      <mass value="0.115033"/>
+      <inertia ixx="0.00004115765" ixy="0" ixz="0" iyy="0.00004115765" iyz="0" izz="0.00004956023"/>
     </inertial>
   </link>
   <joint name="lidar_joint" type="fixed">
     <parent link="base_link"/>
     <child link="lidar_link"/>
-    <origin xyz="0.1 0 ${base_z/2 + 0.025}"/>
+    <!-- cover_link is 0.08345 above body_link; S3 sits 1 cm behind its center -->
+    <origin xyz="-0.01 0 0.08345"/>
   </joint>
 
-  <gazebo reference="lidar_link">
+  <!-- Scan frame at the optical center, yawed 180 deg like the real driver's frame -->
+  <link name="laser"/>
+  <joint name="laser_joint" type="fixed">
+    <parent link="lidar_link"/>
+    <child link="laser"/>
+    <origin xyz="0 0 0.0305" rpy="0 0 ${pi}"/>
+  </joint>
+
+  <gazebo reference="laser">
     <sensor name="lidar" type="gpu_lidar">
       <topic>scan</topic>
-      <gz_frame_id>lidar_link</gz_frame_id>
+      <gz_frame_id>laser</gz_frame_id>
       <update_rate>10</update_rate>
       <always_on>true</always_on>
       <visualize>true</visualize>
       <lidar>
         <scan>
           <horizontal>
-            <samples>360</samples>
+            <!-- 32 kHz sampling at 10 Hz gives 3200 points, 0.1125 deg apart -->
+            <samples>3200</samples>
             <min_angle>${-pi}</min_angle>
-            <max_angle>${pi - 2*pi/360}</max_angle>
+            <max_angle>${pi - 2*pi/3200}</max_angle>
           </horizontal>
         </scan>
         <range>
-          <min>0.12</min>
-          <max>20.0</max>
+          <min>0.05</min>
+          <max>40.0</max>
           <resolution>0.01</resolution>
         </range>
-        <!-- This stddev is the EKF's range measurement noise -->
+        <!-- Datasheet accuracy is +-30 mm, taken as about 2 sigma -->
         <noise>
           <type>gaussian</type>
           <mean>0.0</mean>
-          <stddev>0.01</stddev>
+          <stddev>0.015</stddev>
         </noise>
       </lidar>
     </sensor>
   </gazebo>
 
+  <xacro:macro name="wheel_control" params="side">
+    <joint name="${side}_wheel_joint">
+      <command_interface name="velocity"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </xacro:macro>
+
   <ros2_control name="maze_runner_system" type="system">
     <hardware>
       <plugin>gz_ros2_control/GazeboSimSystem</plugin>
     </hardware>
-    <joint name="left_wheel_joint">
-      <command_interface name="velocity"/>
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-    </joint>
-    <joint name="right_wheel_joint">
-      <command_interface name="velocity"/>
-      <state_interface name="position"/>
-      <state_interface name="velocity"/>
-    </joint>
+    <xacro:wheel_control side="fl"/>
+    <xacro:wheel_control side="fr"/>
+    <xacro:wheel_control side="rl"/>
+    <xacro:wheel_control side="rr"/>
   </ros2_control>
 
   <gazebo>

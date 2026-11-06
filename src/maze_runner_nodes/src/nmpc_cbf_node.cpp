@@ -13,6 +13,7 @@
 #include <nav_msgs/msg/path.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/laser_scan.hpp>
+#include <std_msgs/msg/float64.hpp>
 #include <tf2_ros/buffer.hpp>
 #include <tf2_ros/transform_listener.hpp>
 
@@ -83,6 +84,8 @@ public:
     cmd_pub_ = create_publisher<geometry_msgs::msg::TwistStamped>("diff_drive_controller/cmd_vel", 10);
     path_pub_ = create_publisher<nav_msgs::msg::Path>(
       "nmpc/reference", rclcpp::QoS(1).transient_local());
+    // Wall-clock solve time per step [ms], for offline evaluation.
+    solve_time_pub_ = create_publisher<std_msgs::msg::Float64>("nmpc/solve_time_ms", 10);
     scan_sub_ = create_subscription<sensor_msgs::msg::LaserScan>(
       "scan", rclcpp::SensorDataQoS(),
       [this](sensor_msgs::msg::LaserScan::ConstSharedPtr msg) { on_scan(*msg); });
@@ -150,6 +153,7 @@ private:
     const double ms =
       std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
     publish_cmd(u(0), u(1));
+    solve_time_pub_->publish(std_msgs::msg::Float64().set__data(ms));
 
     if (!mpc_->last_solve_succeeded()) {
       RCLCPP_WARN(get_logger(), "NMPC did not converge, reusing last command");
@@ -207,6 +211,7 @@ private:
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr cmd_pub_;
   rclcpp::Publisher<nav_msgs::msg::Path>::SharedPtr path_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr solve_time_pub_;
   rclcpp::Subscription<sensor_msgs::msg::LaserScan>::SharedPtr scan_sub_;
   rclcpp::TimerBase::SharedPtr timer_;
 };

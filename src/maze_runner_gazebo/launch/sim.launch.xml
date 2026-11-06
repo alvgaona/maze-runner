@@ -10,6 +10,8 @@
   <arg name="x" default="2.393"/>
   <arg name="y" default="4.307"/>
   <arg name="yaw" default="0.045"/>
+  <!-- Bag output directory; empty disables recording. Ctrl-C the launch to close it. -->
+  <arg name="bag" default=""/>
 
   <!-- Server and GUI run as separate processes: required on macOS, harmless on Linux -->
   <include file="$(find-pkg-share ros_gz_sim)/launch/gz_sim.launch.py">
@@ -52,4 +54,11 @@
         args="-d $(find-pkg-share maze_runner_gazebo)/config/sim.rviz">
     <param name="use_sim_time" value="true"/>
   </node>
+  <!-- Everything needed to score a run offline: truth vs EKF, commands, scans, timing -->
+  <executable if="$(eval '\'$(var bag)\' != \'\'')" output="screen"
+              cmd="ros2 bag record -s mcap -o $(var bag) --use-sim-time --topics
+                   /clock /tf /tf_static /scan /joint_states
+                   /ground_truth/odom /ekf/pose /diff_drive_controller/odom
+                   /diff_drive_controller/cmd_vel /diff_drive_controller/cmd_vel_out
+                   /nmpc/reference /nmpc/solve_time_ms"/>
 </launch>
