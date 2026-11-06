@@ -15,11 +15,31 @@
       <render_engine>ogre2</render_engine>
     </plugin>
 
+    <scene>
+      <ambient>0.6 0.6 0.6 1</ambient>
+      <background>0.6 0.75 0.9 1</background>
+      <grid>false</grid>
+      <shadows>true</shadows>
+      <sky/>
+    </scene>
+
+    <!-- High (about 75 deg) late-morning sun from the south-east: 4 m walls in 2.8 m
+         corridors cast short shadows, so the corridors stay lit. -->
     <light type="directional" name="sun">
       <cast_shadows>true</cast_shadows>
-      <pose>16 30 20 0 0 0</pose>
-      <diffuse>0.8 0.8 0.8 1</diffuse>
-      <direction>-0.5 0.1 -0.9</direction>
+      <pose>16 30 50 0 0 0</pose>
+      <diffuse>1.0 0.97 0.9 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <direction>-0.2 0.18 -0.96</direction>
+    </light>
+
+    <!-- Soft fill from the opposite side, no shadows: lifts the shaded wall faces. -->
+    <light type="directional" name="fill">
+      <cast_shadows>false</cast_shadows>
+      <pose>16 30 50 0 0 0</pose>
+      <diffuse>0.35 0.38 0.45 1</diffuse>
+      <specular>0 0 0 1</specular>
+      <direction>0.3 -0.3 -0.9</direction>
     </light>
 
     <model name="ground_plane">
@@ -31,7 +51,10 @@
         </collision>
         <visual name="visual">
           <geometry><plane><normal>0 0 1</normal><size>60 90</size></plane></geometry>
-          <material><diffuse>0.39 0.25 0.1 1</diffuse></material>
+          <material>
+            <ambient>0.55 0.45 0.3 1</ambient>
+            <diffuse>0.6 0.5 0.33 1</diffuse>
+          </material>
         </visual>
       </link>
     </model>
@@ -44,7 +67,10 @@
         </collision>
         <visual name="visual">
           <geometry><mesh><uri>meshes/maze.stl</uri></mesh></geometry>
-          <material><diffuse>0.13 0.45 0.2 1</diffuse></material>
+          <material>
+            <ambient>0.2 0.5 0.25 1</ambient>
+            <diffuse>0.25 0.6 0.3 1</diffuse>
+          </material>
         </visual>
       </link>
     </model>

@@ -6,7 +6,7 @@ platforms:
   - __linux=4.18
   - __glibc=2.28
   - __archspec=0=x86_64
-- name: osx-arm64-macos-14-0
+- name: mac
   subdir: osx-arm64
   virtual-packages:
   - __osx=14.0
@@ -927,7 +927,7 @@ environments:
       - conda: https://conda.anaconda.org/robostack-lyrical/linux-64/ros2-zenoh-cpp-vendor-0.10.6-np2py312h38098f1_30.conda
       - conda: https://conda.anaconda.org/robostack-lyrical/linux-64/ros2-zstd-cmake-module-0.33.4-np2py312h1bab3cf_30.conda
       - conda: https://conda.anaconda.org/robostack-lyrical/linux-64/ros2-zstd-image-transport-6.2.6-np2py312h2d2678e_30.conda
-      osx-arm64-macos-14-0:
+      mac:
       - conda: https://conda.anaconda.org/conda-forge/noarch/_python_abi3_support-1.0-hd8ed1ab_3.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/adwaita-icon-theme-51.0-unix_0.conda
       - conda: https://conda.anaconda.org/conda-forge/noarch/aiohappyeyeballs-2.7.1-pyhd8ed1ab_0.conda

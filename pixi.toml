@@ -1,10 +1,7 @@
 [workspace]
 name = "maze-runner"
 channels = ["robostack-lyrical", "conda-forge"]
-platforms = ["osx-arm64", "linux-64"]
-
-[system-requirements]
-macos = "14.0"
+platforms = [{ name = "mac", platform = "osx-arm64", macos = "14.0" }, "linux-64"]
 
 [dependencies]
 ros-lyrical-desktop = "*"
